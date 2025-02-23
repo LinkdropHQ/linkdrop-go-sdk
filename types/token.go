@@ -6,7 +6,7 @@ import (
 	"math/big"
 )
 
-var zeroAddress = common.Address{}
+var ZeroAddress = common.Address{}
 
 type TokenType string
 
@@ -29,11 +29,11 @@ func (t *Token) Validate() error {
 		return errors.New("chain is not supported")
 	}
 
-	if t.Type == TokenTypeNative && t.Address != zeroAddress {
+	if t.Type == TokenTypeNative && t.Address != ZeroAddress {
 		return errors.New("native token should not have address")
 	}
 
-	if t.Type != TokenTypeNative && t.Address == zeroAddress {
+	if t.Type != TokenTypeNative && t.Address == ZeroAddress {
 		return errors.New("address is not provided")
 	}
 

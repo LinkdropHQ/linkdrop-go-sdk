@@ -13,10 +13,10 @@ import (
 type SDK struct {
 	Client         *Client
 	Deployment     types.Deployment
-	GetRandomBytes func(length int64) []byte
+	GetRandomBytes types.RandomBytesCallback
 }
 
-func Init(baseUrl string, deployment types.Deployment, getRandomBytes func(length int64) []byte, opts ...Option) (*SDK, error) {
+func Init(baseUrl string, deployment types.Deployment, getRandomBytes types.RandomBytesCallback, opts ...Option) (*SDK, error) {
 	if baseUrl == "" {
 		return nil, errors.New("baseUrl is required")
 	}
@@ -25,6 +25,11 @@ func Init(baseUrl string, deployment types.Deployment, getRandomBytes func(lengt
 	}
 	if getRandomBytes == nil {
 		return nil, errors.New("getRandomBytes is required")
+	}
+
+	err := helpers.LoadABI()
+	if err != nil {
+		return nil, err
 	}
 
 	cfg := new(Config)
@@ -101,9 +106,7 @@ func (sdk *SDK) GetSenderHistory(
 	return
 }
 
-func (sdk *SDK) GetLimits(
-	token types.Token,
-) (limits *types.TransferLimits, err error) {
+func (sdk *SDK) GetLimits(token types.Token) (limits *types.TransferLimits, err error) {
 	err = token.Validate()
 	if err != nil {
 		return
@@ -134,3 +137,9 @@ func (sdk *SDK) initializeClaimLink(
 ) (claimLink *types.ClaimLink, err error) {
 	return new(types.ClaimLink), nil
 }
+
+func (sdk *SDK) GetClaimLink() {}
+
+func (sdk *SDK) RetrieveClaimLink() {}
+
+func (sdk *SDK) getCurrentFee() {}

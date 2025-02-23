@@ -1,0 +1,34 @@
+package helpers
+
+import (
+	"crypto/ecdsa"
+	"fmt"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"math/big"
+)
+
+func PrivateKeyFromHex(privateKeyHex string) (*ecdsa.PrivateKey, error) {
+	return crypto.HexToECDSA(privateKeyHex)
+}
+
+func PrivateKey(
+	getRandomBytes types.RandomBytesCallback,
+) (*ecdsa.PrivateKey, error) {
+	seed := getRandomBytes(32)
+	if len(seed) != 32 {
+		return nil, fmt.Errorf("seed must be exactly 32 bytes")
+	}
+	d := new(big.Int).SetBytes(seed)
+	curve := crypto.S256()
+	order := curve.Params().N
+	if d.Sign() <= 0 || d.Cmp(order) >= 0 {
+		return nil, fmt.Errorf("seed is out of valid range for secp256k1 private key")
+	}
+	privateKey := new(ecdsa.PrivateKey)
+	privateKey.D = d
+	privateKey.PublicKey.Curve = curve
+	privateKey.PublicKey.X, privateKey.PublicKey.Y = curve.ScalarBaseMult(seed)
+
+	return privateKey, nil
+}
