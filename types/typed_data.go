@@ -8,6 +8,7 @@ type TypedDataDomain struct {
 	Version           string
 	ChainId           ChainId
 	VerifyingContract *common.Address
+	Salt              *[]byte
 }
 
 // TypedDataField represents a field inside the data types for signing

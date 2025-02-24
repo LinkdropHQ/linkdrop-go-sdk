@@ -7,8 +7,12 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
-	"time"
 )
+
+type SenderHistory struct {
+	ClaimLinks []ClaimLink     `json:"claimLinks"`
+	ResultSet  types.ResultSet `json:"resultSet"`
+}
 
 type SDK struct {
 	Client         *Client
@@ -60,10 +64,10 @@ func (sdk *SDK) GetLinkSourceFromClaimUrl(claimUrl string) (types.CLSource, erro
 
 func (sdk *SDK) CreateClaimLink(
 	token types.Token,
-	amount big.Int,
+	amount *big.Int,
 	sender common.Address,
-	expiration time.Duration,
-) (claimLink *types.ClaimLink, err error) {
+	expiration *big.Int,
+) (claimLink *ClaimLink, err error) {
 	err = token.Validate()
 	if err != nil {
 		return
@@ -79,7 +83,6 @@ func (sdk *SDK) CreateClaimLink(
 		expiration,
 		sender,
 		types.CLSourceP2P,
-		"deployment", // TODO SDK deployment - "this.deployment"
 		nil,
 	)
 }
@@ -90,7 +93,7 @@ func (sdk *SDK) GetSenderHistory(
 	onlyActive bool,
 	offset int64,
 	limit int64,
-) (history *types.SenderHistory, err error) {
+) (history *SenderHistory, err error) {
 	err = token.Validate()
 	if err != nil {
 		return
@@ -101,7 +104,7 @@ func (sdk *SDK) GetSenderHistory(
 		return
 	}
 
-	history = new(types.SenderHistory)
+	history = new(SenderHistory)
 	err = json.Unmarshal(apiResponse, history)
 	return
 }
@@ -128,18 +131,54 @@ func (sdk *SDK) GetLimits(token types.Token) (limits *types.TransferLimits, err 
 
 func (sdk *SDK) initializeClaimLink(
 	token types.Token,
-	amount big.Int,
-	expiration time.Duration,
+	amount *big.Int,
+	expiration *big.Int,
 	sender common.Address,
 	source types.CLSource,
-	deployment types.Deployment,
-	transferId *string,
-) (claimLink *types.ClaimLink, err error) {
-	return new(types.ClaimLink), nil
+	transferId *common.Address,
+) (claimLink *ClaimLink, err error) {
+	claimLink = &ClaimLink{
+		Token:      token,
+		Amount:     amount,
+		Expiration: expiration,
+		Sender:     sender,
+		Source:     source,
+		TransferId: *transferId,
+	}
+	err = claimLink.Validate()
+	return
+}
+
+func (sdk *SDK) GetCurrentFee(
+	token types.Token,
+	sender common.Address,
+	transferId common.Address,
+	expiration *big.Int,
+	amount *big.Int,
+) (fee *big.Int, err error) {
+	feeB, err := sdk.Client.GetFee(
+		token,
+		sender,
+		transferId,
+		expiration,
+		amount,
+	)
+	getFeeResp := &struct {
+		FeeAmount            []byte `json:"fee_amount"`
+		TotalAmount          []byte `json:"total_amount"`
+		FeeAuthorization     []byte `json:"fee_authorization"`
+		FeeToken             []byte `json:"fee_token"`
+		PendingTxs           []byte `json:"pending_txs"`
+		PendingBlocks        []byte `json:"pending_blocks"`
+		PendingTxSubmittedBn []byte `json:"pending_tx_submitted_bn"`
+		PendingTxSubmittedAt []byte `json:"pending_tx_submitted_at"`
+		MinTransferAmount    []byte `json:"min_transfer_amount"`
+		MaxTransferAmount    []byte `json:"max_transfer_amount"`
+	}{}
+	err = json.Unmarshal(feeB, getFeeResp)
+	return &big.Int{}, err
 }
 
 func (sdk *SDK) GetClaimLink() {}
 
 func (sdk *SDK) RetrieveClaimLink() {}
-
-func (sdk *SDK) getCurrentFee() {}

@@ -10,6 +10,7 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
+	"time"
 )
 
 type ClaimLink struct {
@@ -376,12 +377,113 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 	return txHash, cl.TransferId, claimUrl, err
 }
 
-// TODO
-func (cl *ClaimLink) IsDepositWithAuthorizationAvailable() {
+func (cl *ClaimLink) IsDepositWithAuthorizationAvailable(address common.Address) bool {
+	return constants.SupportedStableCoins[address] != constants.SelectorUndefined
 }
 
-// TODO
-func (cl *ClaimLink) DepositWithAuthorization() {
+func (cl *ClaimLink) DepositWithAuthorization(
+	signTypedData types.SignTypedDataCallback,
+	authConfig *types.AuthorizationConfig,
+) (txHash common.Hash, transferId common.Address, claimUrl string, err error) {
+	if !cl.validated {
+		err = errors.New("claim link is not validated. Run Validate()")
+		return
+	}
+	if cl.EscrowAddress == nil {
+		err = errors.New("escrow address is not defined for claim link")
+		return
+	}
+	if cl.Expiration == nil {
+		err = errors.New("expiration is not defined for claim link")
+		return
+	}
+	if cl.Amount == nil {
+		err = errors.New("amount is not defined for claim link")
+		return
+	}
+	if signTypedData == nil {
+		err = errors.New("signTypedData callback is required")
+		return
+	}
+	if authConfig == nil {
+		// TODO implement
+		err = errors.New("authorization config is required")
+		return
+	}
+	if cl.Status >= types.CLItemStatusDeposited {
+		err = errors.New("can't deposit with authorization for claim link with status " + cl.Status.String())
+		return
+	}
+	if cl.Token.Type == types.TokenTypeNative {
+		err = errors.New("can't deposit with authorization for native token")
+		return
+	}
+	// TODO double-check
+	if cl.LinkKey != nil {
+		err = errors.New("can't deposit with authorization for claim link with link key")
+		return
+	}
+	authSelector, err := authConfig.AuthorizationMethod.Selector()
+	if err != nil {
+		return
+	}
+	now := time.Now().Unix()
+	validAfter := now - 60*60
+	validBefore := now + 60*60*24
+	authorization, err := helpers.GetDepositAuthorization(
+		signTypedData,
+		cl.Sender,
+		*cl.EscrowAddress,
+		cl.Amount,
+		validAfter,
+		validBefore,
+		cl.TransferId,
+		cl.Expiration,
+		authConfig.Domain,
+		cl.Token,
+		cl.Fee.Amount,
+		constants.Selector(authSelector),
+		authConfig.AuthorizationMethod,
+	)
+	if err != nil {
+		return
+	}
+
+	result, err := cl.SDK.Client.DepositWithAuthorization(
+		cl.Token,
+		cl.Sender,
+		*cl.EscrowAddress,
+		cl.TransferId,
+		cl.Expiration,
+		authorization,
+		authSelector,
+		*cl.Fee,
+		cl.Amount,
+		cl.TotalAmount,
+		cl.EncryptedSenderMessage.Message,
+	)
+	if err != nil {
+		return
+	}
+	var linkKey *ecdsa.PrivateKey
+	if cl.LinkKey != nil {
+		linkKey = cl.LinkKey
+	}
+	linkParams := types.Link{
+		LinkKey:       linkKey,
+		TransferId:    cl.TransferId,
+		ChainId:       cl.Token.ChainId,
+		Sender:        &cl.Sender,
+		EncryptionKey: &cl.EncryptedSenderMessage.EncryptionKey,
+	}
+
+	claimUrl = helpers.EncodeLink(
+		cl.SDK.Client.config.apiURL,
+		linkParams,
+	)
+	cl.ClaimUrl = &claimUrl
+	cl.Status = types.CLItemStatusDeposited
+	return common.BytesToHash(result), cl.TransferId, claimUrl, err
 }
 
 func (cl *ClaimLink) GetCurrentFee() (fee *types.CLFeeData, err error) {
@@ -572,5 +674,3 @@ func (cl *ClaimLink) getFee(amount *big.Int) (fee *types.CLFeeData, err error) {
 	}
 	return fee, nil
 }
-
-func (cl *ClaimLink) defineDomain() {}

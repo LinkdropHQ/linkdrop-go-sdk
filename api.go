@@ -262,7 +262,7 @@ func (c *Client) Deposit(
 		"token_type":               string(token.Type),
 		"expiration":               expiration.String(),
 		"tx_hash":                  txHash.Hex(),
-		"fee_authorization":        fee.Authorization,
+		"fee_authorization":        "0x" + fee.Authorization,
 		"amount":                   amount.String(),
 		"fee_amount":               fee.Amount.String(),
 		"total_amount":             totalAmount.String(),
@@ -292,28 +292,37 @@ func (c *Client) Deposit(
 }
 
 func (c *Client) DepositWithAuthorization(
-	apiHost, apiKey, token, tokenType, sender, escrow, transferId, expiration, authorization, authorizationSelector, feeAuthorization, amount string,
-	feeAmount, totalAmount, encryptedSenderMessage string,
+	token types.Token,
+	sender common.Address,
+	escrow common.Address,
+	transferId common.Address,
+	expiration *big.Int,
+	authorization []byte,
+	authorizationSelector string,
+	fee types.CLFee,
+	amount *big.Int,
+	totalAmount *big.Int,
+	encryptedSenderMessage string,
 ) ([]byte, error) {
 	// Create the body of the request
 	body, err := json.Marshal(map[string]string{
-		"sender":                   sender,
-		"escrow":                   escrow,
-		"transfer_id":              transferId,
-		"token":                    token,
-		"token_type":               tokenType,
-		"expiration":               expiration,
-		"amount":                   amount,
-		"authorization":            authorization,
+		"sender":                   sender.Hex(),
+		"escrow":                   escrow.Hex(),
+		"transfer_id":              transferId.Hex(),
+		"token":                    token.Address.Hex(),
+		"token_type":               string(token.Type),
+		"expiration":               expiration.String(),
+		"amount":                   amount.String(),
+		"authorization":            "0x" + hex.EncodeToString(authorization),
 		"authorization_selector":   authorizationSelector,
-		"fee_amount":               feeAmount,
-		"total_amount":             totalAmount,
-		"fee_authorization":        feeAuthorization,
+		"fee_amount":               fee.Amount.String(),
+		"total_amount":             totalAmount.String(),
+		"fee_authorization":        "0x" + fee.Authorization,
 		"encrypted_sender_message": encryptedSenderMessage,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	return helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", apiHost), "POST", helpers.DefineHeaders(apiKey), body)
+	return helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", c.config.apiURL), "POST", helpers.DefineHeaders(c.config.apiKey), body)
 }

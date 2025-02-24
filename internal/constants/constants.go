@@ -16,13 +16,13 @@ var (
 	CbwEscrowNFTContractAddress = common.HexToAddress("0x3c74782de03c0402d207fe41307fe50fe9b6b5c7")
 )
 
-var SupportedStableCoins = map[TokenAddress]Selector{
-	UsdcBase:           ReceiveWithAuthorization,
-	EurcBase:           ReceiveWithAuthorization,
-	UsdcBridgedPolygon: ApproveWithAuthorization,
-	UsdcPolygon:        ReceiveWithAuthorization,
-	UsdcArbitrum:       ReceiveWithAuthorization,
-	UsdcOptimism:       ReceiveWithAuthorization,
-	UsdcAvalanche:      ReceiveWithAuthorizationEOA,
-	CbBTC:              ReceiveWithAuthorizationEOA,
+var SupportedStableCoins = map[common.Address]Selector{
+	TAUsdcBase:           SelectorReceiveWithAuthorization,
+	TAEurcBase:           SelectorReceiveWithAuthorization,
+	TAUsdcBridgedPolygon: SelectorApproveWithAuthorization,
+	TAUsdcPolygon:        SelectorReceiveWithAuthorization,
+	TAUsdcArbitrum:       SelectorReceiveWithAuthorization,
+	TAUsdcOptimism:       SelectorReceiveWithAuthorization,
+	TAUsdcAvalanche:      SelectorReceiveWithAuthorizationEOA,
+	TACbBTC:              SelectorReceiveWithAuthorizationEOA,
 }
