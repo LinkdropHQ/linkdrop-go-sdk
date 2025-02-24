@@ -249,7 +249,7 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 		Token: types.Token{
 			Type:    types.TokenType(cl["token_type"].(string)),
 			ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
-			Address: common.HexToAddress(cl["sender"].(string)),
+			Address: common.HexToAddress(cl["token"].(string)),
 			Id:      tokenId,
 		},
 		Amount:      amount,

@@ -2,10 +2,13 @@ package helpers
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 )
+
+const EIP191Prefix = "\x19Ethereum Signed Message:\n"
 
 // GenerateReceiverSig takes a private key in hexadecimal format (linkKey) and a receiver Ethereum address,
 // and generates a signature for the receiver address using the Keccak256 hashing algorithm and the private key.
@@ -28,8 +31,19 @@ import (
 //	  }
 //	  fmt.Printf("Generated signature: %x\n", sig)
 func GenerateReceiverSig(linkKey *ecdsa.PrivateKey, receiver common.Address) ([]byte, error) {
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write(receiver.Bytes())
+	messageHash := sha3.NewLegacyKeccak256()
+	messageHash.Write(receiver.Bytes())
+	message := messageHash.Sum(nil)
 
-	return crypto.Sign(hash.Sum(nil), linkKey)
+	prefix := []byte(EIP191Prefix)
+	length := []byte(fmt.Sprintf("%d", len(message)))
+
+	eip191Hash := sha3.NewLegacyKeccak256()
+	eip191Hash.Write(append(append(prefix, length...), message...))
+
+	signature, err := crypto.Sign(eip191Hash.Sum(nil), linkKey)
+	if signature[64] < 27 {
+		signature[64] += 27
+	}
+	return signature, err
 }

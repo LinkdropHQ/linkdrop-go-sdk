@@ -246,7 +246,7 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 		}
 		return common.BytesToHash(bTxHash), nil
 	}
-	bTxHash, err := cl.SDK.Client.RedeemLink(
+	bApiResp, err := cl.SDK.Client.RedeemLink(
 		cl.ChainId,
 		receiver,
 		cl.TransferId,
@@ -255,7 +255,19 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 		&cl.EscrowAddress,
 		&cl.Token,
 	)
-	return common.BytesToHash(bTxHash), nil
+	ApiRespModel := struct {
+		Success bool   `json:"success"`
+		TxHash  string `json:"tx_hash"`
+		Error   string `json:"error"`
+	}{}
+	err = json.Unmarshal(bApiResp, &ApiRespModel)
+	if err != nil {
+		return common.HexToHash(ApiRespModel.TxHash), err
+	}
+	if !ApiRespModel.Success {
+		return common.HexToHash(ApiRespModel.TxHash), errors.New(ApiRespModel.Error)
+	}
+	return common.HexToHash(ApiRespModel.TxHash), nil
 }
 
 func (cl *ClaimLink) GetStatus() (types.CLItemStatus, []types.CLOperation, error) {

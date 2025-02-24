@@ -29,7 +29,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	link, err := sdk.GetClaimLink(
-		os.Getenv("TEST_CLAIM_LINK"),
+		os.Getenv("LINKDROP_LINK"),
 	)
 	if err != nil {
 		log.Fatalln(err)
