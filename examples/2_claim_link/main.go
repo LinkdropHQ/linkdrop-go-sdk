@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"github.com/LinkdropHQ/linkdrop-go-sdk"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
+	"github.com/ethereum/go-ethereum/common"
 	"log"
+	"math/big"
 	"os"
 )
 
@@ -18,14 +20,23 @@ func getRandomBytes(length int64) []byte {
 }
 
 func main() {
-	client, err := linkdrop.Init(
+	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
 		types.DeploymentCBW,
 		getRandomBytes,
 		linkdrop.WithApiKey(os.Getenv("LINKDROP_API_KEY")),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatalln(err)
 	}
-	log.Println(client)
+	claimLink, err := sdk.CreateClaimLink(
+		types.Token{
+			Type:    types.TokenTypeNative,
+			ChainId: types.ChainIdBase,
+		},
+		big.NewInt(1000000000),
+		common.HexToAddress("0x3A205ECf286bBe11460638aCe47D501A53fB91C0"),
+		big.NewInt(1000000000),
+	)
+	log.Println(sdk, claimLink)
 }

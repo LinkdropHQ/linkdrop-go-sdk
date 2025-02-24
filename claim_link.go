@@ -9,6 +9,8 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"math/big"
 	"time"
 )
@@ -26,7 +28,7 @@ type ClaimLink struct {
 	Fee                    *types.CLFee
 	Expiration             *big.Int
 	TransferId             common.Address
-	EscrowAddress          *common.Address
+	EscrowAddress          common.Address
 	Operations             []types.CLOperation
 	LinkKey                *ecdsa.PrivateKey
 	ClaimUrl               *string
@@ -34,6 +36,7 @@ type ClaimLink struct {
 	Status                 types.CLItemStatus // CLItemStatusUndefined by default
 	Source                 types.CLSource     // CLSourceUndefined by default
 	EncryptedSenderMessage *types.EncryptedMessage
+	ChainId                types.ChainId
 	validated              bool
 }
 
@@ -66,11 +69,13 @@ func (cl *ClaimLink) Validate() (err error) {
 		return errors.New("amount is required")
 	}
 
-	if cl.Source == types.CLSourceP2P {
-		if cl.EscrowAddress == nil {
-			return errors.New("escrow address is required for source P2P")
+	if cl.EscrowAddress == types.ZeroAddress {
+		if cl.Token.Type == types.TokenTypeERC1155 || cl.Token.Type == types.TokenTypeERC721 {
+			// TODO refactor - move escrow address to SDK config
+			cl.EscrowAddress = cl.SDK.Client.config.escrowNFTContractAddress
+		} else {
+			cl.EscrowAddress = cl.SDK.Client.config.escrowContractAddress
 		}
-		// TODO validate EscrowAddress - defineIfEscrowAddressIsCorrect
 	}
 
 	cl.validated = true
@@ -122,12 +127,6 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 	if !cl.validated {
 		return nil, errors.New("claim link is not validated. Run Validate()")
 	}
-	if cl.EscrowAddress == nil {
-		return nil, errors.New("escrowAddress is not defined for claim link")
-	}
-	if *cl.EscrowAddress == types.ZeroAddress {
-		return nil, errors.New("escrowAddress can't be zero address")
-	}
 
 	var data []byte
 	senderMessage := ""
@@ -141,7 +140,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			"depositETH",
 			cl.TransferId,
 			cl.TotalAmount.String(),
-			cl.Expiration, // TODO check expiration
+			cl.Expiration.String(), // TODO check expiration
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
 			senderMessage,
@@ -152,7 +151,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.Token.Address.Hex(),
 			cl.TransferId,
 			cl.TotalAmount.String(),
-			cl.Expiration, // TODO check expiration
+			cl.Expiration.String(), // TODO check expiration
 			cl.Fee.Token.Address.Hex(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
@@ -164,7 +163,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.Token.Address.Hex(),
 			cl.TransferId,
 			cl.Token.Id.String(),
-			cl.Expiration, // TODO check expiration
+			cl.Expiration.String(), // TODO check expiration
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
 			senderMessage,
@@ -175,7 +174,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.TransferId,
 			cl.Token.Id.String(),
 			cl.Amount,
-			cl.Expiration, // TODO check expiration
+			cl.Expiration.String(), // TODO check expiration
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
 			senderMessage,
@@ -193,7 +192,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 	return &types.CLDepositParams{
 		Value: value,
 		Data:  data,
-		To:    *cl.EscrowAddress,
+		To:    cl.EscrowAddress,
 	}, nil
 }
 
@@ -216,15 +215,13 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 			return txHash, err
 		}
 		bTxHash, err := cl.SDK.Client.RedeemLink(
+			cl.ChainId,
 			receiver,
 			cl.TransferId,
 			receiverSignature,
 			nil, nil, nil,
 		)
 		return common.BytesToHash(bTxHash), nil
-	}
-	if cl.EscrowAddress == nil {
-		return txHash, errors.New("cannot redeem before deposit")
 	}
 	decodedLink, err := helpers.DecodeLink(*cl.ClaimUrl)
 	if err != nil {
@@ -241,7 +238,7 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 			receiverSig,
 			decodedLink.SenderSig,
 			cl.Sender,
-			*cl.EscrowAddress,
+			cl.EscrowAddress,
 			cl.Token,
 		)
 		if err != nil {
@@ -250,11 +247,12 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 		return common.BytesToHash(bTxHash), nil
 	}
 	bTxHash, err := cl.SDK.Client.RedeemLink(
+		cl.ChainId,
 		receiver,
 		cl.TransferId,
 		receiverSig,
 		&cl.Sender,
-		cl.EscrowAddress,
+		&cl.EscrowAddress,
 		&cl.Token,
 	)
 	return common.BytesToHash(bTxHash), nil
@@ -267,7 +265,7 @@ func (cl *ClaimLink) GetStatus() (types.CLItemStatus, []types.CLOperation, error
 	if cl.TransferId == types.ZeroAddress {
 		return types.CLItemStatusUndefined, nil, errors.New("transfer id is not defined for claim link")
 	}
-	linkB, err := cl.SDK.Client.GetTransferStatus(cl.TransferId)
+	linkB, err := cl.SDK.Client.GetTransferStatus(cl.Token.ChainId, cl.TransferId)
 	claimLink := struct {
 		Status     types.CLItemStatus  `json:"status"`
 		Operations []types.CLOperation `json:"operations"`
@@ -318,9 +316,6 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 	if !cl.validated {
 		return txHash, transferId, claimUrl, errors.New("claim link is not validated. Run Validate()")
 	}
-	if cl.EscrowAddress == nil {
-		return txHash, transferId, claimUrl, errors.New("escrow address is not defined for claim link")
-	}
 	if sendTransaction == nil {
 		return txHash, transferId, claimUrl, errors.New("sendTransaction callback is required")
 	}
@@ -337,14 +332,16 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 	if cl.EncryptedSenderMessage == nil {
 		cl.EncryptedSenderMessage = new(types.EncryptedMessage)
 	}
+
 	txHash, err = sendTransaction(params.To, params.Value, params.Data)
 	if err != nil {
 		return txHash, transferId, claimUrl, err
 	}
+
 	_, err = cl.SDK.Client.Deposit(
 		cl.Token,
 		cl.Sender,
-		*cl.EscrowAddress,
+		cl.EscrowAddress,
 		cl.TransferId,
 		cl.Expiration,
 		txHash,
@@ -389,10 +386,6 @@ func (cl *ClaimLink) DepositWithAuthorization(
 		err = errors.New("claim link is not validated. Run Validate()")
 		return
 	}
-	if cl.EscrowAddress == nil {
-		err = errors.New("escrow address is not defined for claim link")
-		return
-	}
 	if cl.Expiration == nil {
 		err = errors.New("expiration is not defined for claim link")
 		return
@@ -433,7 +426,7 @@ func (cl *ClaimLink) DepositWithAuthorization(
 	authorization, err := helpers.GetDepositAuthorization(
 		signTypedData,
 		cl.Sender,
-		*cl.EscrowAddress,
+		cl.EscrowAddress,
 		cl.Amount,
 		validAfter,
 		validBefore,
@@ -452,7 +445,7 @@ func (cl *ClaimLink) DepositWithAuthorization(
 	result, err := cl.SDK.Client.DepositWithAuthorization(
 		cl.Token,
 		cl.Sender,
-		*cl.EscrowAddress,
+		cl.EscrowAddress,
 		cl.TransferId,
 		cl.Expiration,
 		authorization,
@@ -548,27 +541,25 @@ func (cl *ClaimLink) GenerateClaimUrl(signTypedData types.SignTypedDataCallback)
 	if !cl.validated {
 		return "", types.ZeroAddress, errors.New("claim link is not validated. Run Validate()")
 	}
-	if cl.ForRecipient {
-		return "", types.ZeroAddress, errors.New("this link can only be redeemed")
-	}
 	if signTypedData == nil {
 		return "", types.ZeroAddress, errors.New("signTypedData callback is required")
+	}
+	if cl.ForRecipient {
+		return "", types.ZeroAddress, errors.New("this link can only be redeemed")
 	}
 	if cl.TransferId == types.ZeroAddress {
 		return "", types.ZeroAddress, errors.New("transfer id is not defined for claim link")
 	}
-	if cl.EscrowAddress == nil {
-		return "", types.ZeroAddress, errors.New("escrow address is not defined for claim link")
-	}
-	version, err := helpers.DefineEscrowVersion(*cl.EscrowAddress)
+
+	version, err := helpers.DefineEscrowVersion(cl.EscrowAddress)
 	if err != nil {
 		return
 	}
-	escrowPaymentDomain := &types.TypedDataDomain{
+	escrowPaymentDomain := &apitypes.TypedDataDomain{
 		Name:              "LinkdropEscrow",
 		Version:           version,
-		ChainId:           cl.Token.ChainId,
-		VerifyingContract: cl.EscrowAddress,
+		ChainId:           math.NewHexOrDecimal256(int64(cl.Token.ChainId)),
+		VerifyingContract: cl.EscrowAddress.Hex(),
 	}
 	linkKey, _, senderSig, err := helpers.GenerateLinkKeyAndSignature(
 		signTypedData,
@@ -580,7 +571,7 @@ func (cl *ClaimLink) GenerateClaimUrl(signTypedData types.SignTypedDataCallback)
 		return
 	}
 	linkParams := types.Link{
-		SenderSig:  senderSig,
+		SenderSig:  common.Bytes2Hex(senderSig),
 		LinkKey:    linkKey,
 		TransferId: cl.TransferId,
 		ChainId:    cl.Token.ChainId,
@@ -600,7 +591,7 @@ func (cl *ClaimLink) GenerateClaimUrl(signTypedData types.SignTypedDataCallback)
 		linkParams.EncryptionKeyLinkParam = &encryptionKeyLinkParam
 	}
 	claimUrl := helpers.EncodeLink(
-		cl.SDK.Client.config.apiURL,
+		cl.SDK.Client.config.baseURL,
 		linkParams,
 	)
 	cl.ClaimUrl = &claimUrl

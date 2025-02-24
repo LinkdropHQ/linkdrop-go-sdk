@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/constants"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
 type AuthorizationMethod string
@@ -26,6 +27,6 @@ func (am AuthorizationMethod) Selector() (string, error) {
 }
 
 type AuthorizationConfig struct {
-	Domain              TypedDataDomain
+	Domain              apitypes.TypedDataDomain
 	AuthorizationMethod *AuthorizationMethod
 }

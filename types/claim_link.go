@@ -43,6 +43,30 @@ const (
 	CLItemStatusError
 )
 
+func ClItemStatusFromString(itemStatus string) CLItemStatus {
+	switch itemStatus {
+	case "created":
+		return CLItemStatusCreated
+	case "depositing":
+		return CLItemStatusDepositing
+	case "deposited":
+		return CLItemStatusDeposited
+	case "redeeming":
+		return CLItemStatusRedeeming
+	case "redeemed":
+		return CLItemStatusRedeemed
+	case "refunding":
+		return CLItemStatusRefunding
+	case "refunded":
+		return CLItemStatusRefunded
+	case "cancelled":
+		return CLItemStatusCancelled
+	case "error":
+		return CLItemStatusError
+	}
+	return CLItemStatusUndefined
+}
+
 func (clis CLItemStatus) String() string {
 	switch clis {
 	case CLItemStatusUndefined:

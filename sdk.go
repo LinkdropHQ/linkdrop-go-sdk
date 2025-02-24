@@ -137,7 +137,19 @@ func (sdk *SDK) initializeClaimLink(
 	source types.CLSource,
 	transferId *common.Address,
 ) (claimLink *ClaimLink, err error) {
+	if transferId == nil {
+		pk, err := helpers.PrivateKey(sdk.GetRandomBytes)
+		if err != nil {
+			return nil, err
+		}
+		address, err := helpers.AddressFromPrivateKey(pk)
+		if err != nil {
+			return nil, err
+		}
+		transferId = &address
+	}
 	claimLink = &ClaimLink{
+		SDK:        sdk,
 		Token:      token,
 		Amount:     amount,
 		Expiration: expiration,
@@ -179,6 +191,89 @@ func (sdk *SDK) GetCurrentFee(
 	return &big.Int{}, err
 }
 
-func (sdk *SDK) GetClaimLink() {}
+func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) {
+	linkSource, err := sdk.GetLinkSourceFromClaimUrl(claimUrl)
+	if err != nil {
+		return
+	}
+	if linkSource == types.CLSourceD {
+		// TODO handle
+		return nil, errors.New("not implemented yet")
+	}
+
+	decodedLink, err := helpers.DecodeLink(claimUrl)
+	if err != nil {
+		return
+	}
+
+	apiResp, err := sdk.Client.GetTransferStatus(decodedLink.ChainId, decodedLink.TransferId)
+	if err != nil {
+		return
+	}
+
+	respModel := struct {
+		ClaimLink map[string]any `json:"claim_link"`
+	}{}
+	err = json.Unmarshal(apiResp, &respModel)
+	if err != nil {
+		return
+	}
+
+	cl := respModel.ClaimLink
+	tokenId, ok := new(big.Int).SetString(cl["token_id"].(string), 10)
+	if !ok {
+		return nil, errors.New("invalid token_id")
+	}
+	amount, ok := new(big.Int).SetString(cl["amount"].(string), 10)
+	if !ok {
+		return nil, errors.New("invalid amount")
+	}
+	totalAmount, ok := new(big.Int).SetString(cl["total_amount"].(string), 10)
+	if !ok {
+		return nil, errors.New("invalid total_amount")
+	}
+	feeAmount, ok := new(big.Int).SetString(cl["fee_amount"].(string), 10)
+	if !ok {
+		return nil, errors.New("invalid total_amount")
+	}
+	feeTokenAddress := common.HexToAddress(cl["sender"].(string))
+	feeTokenType := types.TokenTypeERC20
+	if feeTokenAddress == types.ZeroAddress {
+		feeTokenType = types.TokenTypeNative
+	}
+
+	claimLink = &ClaimLink{
+		SDK:     sdk,
+		Sender:  common.HexToAddress(cl["sender"].(string)),
+		ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
+		Token: types.Token{
+			Type:    types.TokenType(cl["token_type"].(string)),
+			ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
+			Address: common.HexToAddress(cl["sender"].(string)),
+			Id:      tokenId,
+		},
+		Amount:      amount,
+		TotalAmount: totalAmount,
+		Fee: &types.CLFee{
+			Token: types.Token{
+				Type:    feeTokenType,
+				ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
+				Address: common.HexToAddress(cl["sender"].(string)),
+			},
+			Amount: feeAmount,
+		},
+		Expiration:    big.NewInt(int64(cl["expiration"].(float64))),
+		TransferId:    common.HexToAddress(cl["transfer_id"].(string)),
+		EscrowAddress: common.HexToAddress(cl["escrow"].(string)),
+		Operations:    nil, // TODO
+		LinkKey:       decodedLink.LinkKey,
+		ClaimUrl:      &claimUrl,
+		ForRecipient:  false,
+		Status:        types.ClItemStatusFromString(cl["status"].(string)),
+		Source:        types.CLSource(cl["escrow"].(string)),
+	}
+	err = claimLink.Validate()
+	return
+}
 
 func (sdk *SDK) RetrieveClaimLink() {}

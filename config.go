@@ -2,6 +2,7 @@ package linkdrop
 
 import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/constants"
+	"github.com/ethereum/go-ethereum/common"
 	"time"
 )
 
@@ -18,9 +19,9 @@ type Config struct {
 	dashboardURL             string
 	timeout                  time.Duration
 	retryCount               int64
-	nativeTokenAddress       string
-	escrowContractAddress    string
-	escrowNFTContractAddress string
+	nativeTokenAddress       common.Address
+	escrowContractAddress    common.Address
+	escrowNFTContractAddress common.Address
 	messageConfig            MessageConfig
 	environment              string
 }

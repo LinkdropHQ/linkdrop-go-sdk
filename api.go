@@ -76,6 +76,7 @@ func (c *Client) RedeemRecoveredLink(
 // - Ensure all required parameters are valid before calling this function.
 // - If optional parameters (sender, escrow, or token) are not provided, they will be ignored in the request body.
 func (c *Client) RedeemLink(
+	chainId types.ChainId,
 	receiver common.Address,
 	transferId common.Address,
 	receiverSig []byte,
@@ -83,6 +84,10 @@ func (c *Client) RedeemLink(
 	escrow *common.Address,
 	token *types.Token,
 ) ([]byte, error) {
+	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
+	if err != nil {
+		return []byte{}, err
+	}
 	bodyRaw := map[string]string{
 		"receiver":     receiver.Hex(),
 		"transfer_id":  transferId.Hex(),
@@ -98,7 +103,7 @@ func (c *Client) RedeemLink(
 		bodyRaw["token"] = token.Address.Hex()
 	}
 	body, _ := json.Marshal(bodyRaw)
-	return helpers.Request(fmt.Sprintf("%s/redeem", c.config.apiURL), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	return helpers.Request(fmt.Sprintf("%s/redeem", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
 }
 
 // GetTransferStatus retrieves the payment status of a transfer using its unique transfer ID.
@@ -113,8 +118,15 @@ func (c *Client) RedeemLink(
 // Notes:
 // - The function sends a GET request to the API to fetch the transfer's payment status.
 // - Ensure that the transfer ID is valid and corresponds to an existing transfer.
-func (c *Client) GetTransferStatus(transferId common.Address) ([]byte, error) {
-	return helpers.Request(fmt.Sprintf("%s/payment-status/transfer/%s", c.config.apiURL, transferId.Hex()), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+func (c *Client) GetTransferStatus(
+	chainId types.ChainId,
+	transferId common.Address,
+) ([]byte, error) {
+	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
+	if err != nil {
+		return []byte{}, err
+	}
+	return helpers.Request(fmt.Sprintf("%s/payment-status/transfer/%s", apiHost, transferId.Hex()), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
 }
 
 // GetTransferStatusByTxHash retrieves the payment status of a transfer using its transaction hash.

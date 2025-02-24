@@ -6,6 +6,8 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/crypto"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/mr-tron/base58"
 )
 
@@ -45,25 +47,23 @@ func CreateMessageEncryptionKey(
 	chainId types.ChainId,
 	encryptionKeyLength int64,
 ) (encryptionKey []byte, encryptionKeyLinkParam []byte, err error) {
-	domain := types.TypedDataDomain{
-		Name:    "MyEncryptionScheme",
-		Version: "1",
-		ChainId: chainId,
-	}
-
-	typedData := map[string][]types.TypedDataField{
-		"EncryptionMessage": {
-			{Name: "seed", Type: "string"},
-		},
-	}
-
-	seed := fmt.Sprintf("Encrypting message (transferId: %s)", transferID)
-	value := map[string]interface{}{
-		"seed": seed,
-	}
-
 	// Generating signature
-	signature, err := signTypedData(domain, typedData, value)
+	signature, err := signTypedData(apitypes.TypedData{
+		Domain: apitypes.TypedDataDomain{
+			Name:    "MyEncryptionScheme",
+			Version: "1",
+			ChainId: math.NewHexOrDecimal256(int64(chainId)),
+		},
+		PrimaryType: "EncryptionMessage",
+		Types: map[string][]apitypes.Type{
+			"EncryptionMessage": {
+				{Name: "seed", Type: "string"},
+			},
+		},
+		Message: map[string]interface{}{
+			"seed": fmt.Sprintf("Encrypting message (transferId: %s)", transferID),
+		},
+	})
 	if err != nil {
 		return []byte{}, []byte{}, err
 	}

@@ -2,6 +2,7 @@ package linkdrop
 
 import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/constants"
+	"github.com/ethereum/go-ethereum/common"
 	"time"
 )
 
@@ -37,19 +38,19 @@ func WithRetryCount(retryCount int64) Option {
 	}
 }
 
-func WithNativeTokenAddress(tokenAddress string) Option {
+func WithNativeTokenAddress(tokenAddress common.Address) Option {
 	return func(c *Config) {
 		c.nativeTokenAddress = tokenAddress
 	}
 }
 
-func WithEscrowContractAddress(escrowContractAddress string) Option {
+func WithEscrowContractAddress(escrowContractAddress common.Address) Option {
 	return func(c *Config) {
 		c.escrowContractAddress = escrowContractAddress
 	}
 }
 
-func WithEscrowNFTContractAddress(escrowNFTContractAddress string) Option {
+func WithEscrowNFTContractAddress(escrowNFTContractAddress common.Address) Option {
 	return func(c *Config) {
 		c.escrowNFTContractAddress = escrowNFTContractAddress
 	}

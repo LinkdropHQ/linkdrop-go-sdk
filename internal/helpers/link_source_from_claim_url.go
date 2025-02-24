@@ -10,8 +10,9 @@ func LinkSourceFromClaimUrl(claimUrl string) (types.CLSource, error) {
 	if err != nil {
 		return "unspecified", err
 	}
-	if parsedUrl.Query().Get("src") == "" {
+	src := types.CLSource(parsedUrl.Query().Get("src"))
+	if src == types.CLSourceUndefined {
 		return types.CLSourceP2P, nil
 	}
-	return types.CLSourceD, nil
+	return src, nil
 }

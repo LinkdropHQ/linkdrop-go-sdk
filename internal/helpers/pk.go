@@ -4,12 +4,22 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 )
 
 func PrivateKeyFromHex(privateKeyHex string) (*ecdsa.PrivateKey, error) {
 	return crypto.HexToECDSA(privateKeyHex)
+}
+
+func AddressFromPrivateKey(privateKey *ecdsa.PrivateKey) (common.Address, error) {
+	publicKey := privateKey.Public()
+	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return common.Address{}, fmt.Errorf("failed to type assert public key to *ecdsa.PublicKey")
+	}
+	return crypto.PubkeyToAddress(*publicKeyECDSA), nil
 }
 
 func PrivateKey(

@@ -5,34 +5,40 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
 func GenerateLinkKeyAndSignature(
 	signTypedData types.SignTypedDataCallback,
 	getRandomBytes types.RandomBytesCallback,
 	transferId common.Address,
-	domain types.TypedDataDomain,
-) (linkKey *ecdsa.PrivateKey, linkKeyId common.Address, senderSig string, err error) {
+	domain apitypes.TypedDataDomain,
+) (linkKey *ecdsa.PrivateKey, linkKeyId common.Address, senderSig []byte, err error) {
+
 	linkKey, err = PrivateKey(getRandomBytes)
 	if err != nil {
 		return
 	}
 
-	linkKeyId = crypto.PubkeyToAddress(linkKey.PublicKey)
-
-	typedData := map[string][]types.TypedDataField{
-		"Transfer": {
-			{Name: "linkKeyId", Type: "address"},
-			{Name: "transferId", Type: "address"},
+	senderSig, err = signTypedData(apitypes.TypedData{
+		Domain:      domain,
+		PrimaryType: "Transfer",
+		Types: apitypes.Types{
+			"EIP712Domain": {
+				{Name: "name", Type: "string"},
+				{Name: "version", Type: "string"},
+				{Name: "chainId", Type: "uint256"},
+				{Name: "verifyingContract", Type: "address"},
+			},
+			"Transfer": {
+				{Name: "linkKeyId", Type: "address"},
+				{Name: "transferId", Type: "address"},
+			},
 		},
-	}
-
-	message := map[string]interface{}{
-		"linkKeyId":  linkKeyId.Hex(),
-		"transferId": transferId.Hex(),
-	}
-
-	senderSig, err = signTypedData(domain, typedData, message)
-
+		Message: map[string]any{
+			"linkKeyId":  crypto.PubkeyToAddress(linkKey.PublicKey).Hex(),
+			"transferId": transferId.Hex(),
+		},
+	})
 	return
 }

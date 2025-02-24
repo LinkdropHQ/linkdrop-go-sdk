@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"math/big"
 	"strings"
 )
@@ -20,7 +21,7 @@ func GetDepositAuthorization(
 	validBefore int64,
 	transferId common.Address,
 	expiration *big.Int,
-	domain types.TypedDataDomain,
+	domain apitypes.TypedDataDomain,
 	token types.Token,
 	feeAmount *big.Int,
 	authSelector constants.Selector,
@@ -101,37 +102,36 @@ func getDepositAuthorizationApprove(
 	transferId common.Address,
 	expiration *big.Int,
 	feeAmount *big.Int,
-	domain types.TypedDataDomain,
+	domain apitypes.TypedDataDomain,
 	signTypedData types.SignTypedDataCallback,
 ) ([]byte, error) {
-
-	// Define the EIP-712 types
-	t := map[string][]types.TypedDataField{
-		"ApproveWithAuthorization": {
-			{Type: "address", Name: "owner"},
-			{Type: "address", Name: "spender"},
-			{Type: "uint256", Name: "value"},
-			{Type: "uint256", Name: "validAfter"},
-			{Type: "uint256", Name: "validBefore"},
-			{Type: "bytes32", Name: "nonce"},
-		},
-	}
 
 	// Compute the nonce
 	nonce := crypto.Keccak256Hash([]byte(fmt.Sprintf("%s%s%s%s", sender.Hex(), transferId.Hex(), amount.String(), expiration.String())))
 
-	// Create the message
-	message := map[string]interface{}{
-		"owner":       sender,
-		"spender":     to,
-		"value":       amount,
-		"validAfter":  validAfter,
-		"validBefore": validBefore,
-		"nonce":       nonce.Bytes(),
-	}
-
 	// Sign the typed data
-	signature, err := signTypedData(domain, t, message)
+	signature, err := signTypedData(apitypes.TypedData{
+		Domain:      domain,
+		PrimaryType: "ApproveWithAuthorization",
+		Types: map[string][]apitypes.Type{
+			"ApproveWithAuthorization": {
+				{Type: "address", Name: "owner"},
+				{Type: "address", Name: "spender"},
+				{Type: "uint256", Name: "value"},
+				{Type: "uint256", Name: "validAfter"},
+				{Type: "uint256", Name: "validBefore"},
+				{Type: "bytes32", Name: "nonce"},
+			},
+		},
+		Message: map[string]interface{}{
+			"owner":       sender,
+			"spender":     to,
+			"value":       amount,
+			"validAfter":  validAfter,
+			"validBefore": validBefore,
+			"nonce":       nonce.Bytes(),
+		},
+	})
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to sign typed data: %w", err)
 	}
@@ -172,7 +172,7 @@ func getDepositAuthorizationReceive(
 	transferId common.Address,
 	expiration *big.Int,
 	feeAmount *big.Int,
-	domain types.TypedDataDomain,
+	domain apitypes.TypedDataDomain,
 	authSelector constants.Selector,
 	signTypedData types.SignTypedDataCallback,
 ) ([]byte, error) {
@@ -180,7 +180,6 @@ func getDepositAuthorizationReceive(
 	// Compute the nonce
 	nonce := crypto.Keccak256Hash([]byte(fmt.Sprintf("%s%s%s%s%s", sender.Hex(), transferId.Hex(), amount.String(), expiration.String(), feeAmount.String())))
 
-	// Create the message
 	message := map[string]interface{}{
 		"from":        sender,
 		"to":          to,
@@ -190,20 +189,22 @@ func getDepositAuthorizationReceive(
 		"nonce":       nonce.Bytes(),
 	}
 
-	// Define EIP-712 types for ReceiveWithAuthorization
-	t := map[string][]types.TypedDataField{
-		"ReceiveWithAuthorization": {
-			{Name: "from", Type: "address"},
-			{Name: "to", Type: "address"},
-			{Name: "value", Type: "uint256"},
-			{Name: "validAfter", Type: "uint256"},
-			{Name: "validBefore", Type: "uint256"},
-			{Name: "nonce", Type: "bytes32"},
-		},
-	}
-
 	// Sign the typed data
-	signature, err := signTypedData(domain, t, message)
+	signature, err := signTypedData(apitypes.TypedData{
+		Domain:      domain,
+		PrimaryType: "ReceiveWithAuthorization",
+		Types: map[string][]apitypes.Type{
+			"ReceiveWithAuthorization": {
+				{Name: "from", Type: "address"},
+				{Name: "to", Type: "address"},
+				{Name: "value", Type: "uint256"},
+				{Name: "validAfter", Type: "uint256"},
+				{Name: "validBefore", Type: "uint256"},
+				{Name: "nonce", Type: "bytes32"},
+			},
+		},
+		Message: message,
+	})
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to sign typed data: %w", err)
 	}
