@@ -14,15 +14,15 @@ func EncodeLink(claimHost string, link types.Link) string {
 
 	// Handle optional encryption key
 	var encryptionKey string
-	if link.EncryptionKey != nil {
-		encryptionKey = fmt.Sprintf("&m=0x%x", link.EncryptionKey)
+	if link.EncryptionKeyLinkParam != nil && *link.EncryptionKeyLinkParam != [32]byte{} {
+		encryptionKey = fmt.Sprintf("&m=0x%x", link.EncryptionKeyLinkParam)
 	}
 	chainId := strconv.Itoa(int(link.ChainId))
 
 	// Handle optional SenderSig
-	if link.SenderSig != "" {
+	if link.SenderSig != nil {
 		sigLength := (len(link.SenderSig) - 2) / 2
-		sig := base58.Encode([]byte(link.SenderSig))
+		sig := base58.Encode(link.SenderSig)
 		return fmt.Sprintf("%s/#/code?k=%s&sg=%s&i=%s&c=%s&v=3&sgl=%d&src=p2p%s",
 			claimHost, linkKey, sig, transferId, chainId, sigLength, encryptionKey)
 	}

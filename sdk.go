@@ -124,9 +124,28 @@ func (sdk *SDK) GetLimits(token types.Token) (limits *types.TransferLimits, err 
 		return
 	}
 
-	limits = new(types.TransferLimits)
-	err = json.Unmarshal(apiResponse, limits)
-	return
+	apiResponseModel := struct {
+		Success      bool   `json:"success"`
+		Error        string `json:"error"`
+		MinAmount    string `json:"min_transfer_amount"`
+		MaxAmount    string `json:"max_transfer_amount"`
+		MinAmountUSD string `json:"min_transfer_amount_usd"`
+		MaxAmountUSD string `json:"max_transfer_amount_usd"`
+	}{}
+	err = json.Unmarshal(apiResponse, &apiResponseModel)
+	if !apiResponseModel.Success { // Will be empty string since success is a bool field
+		return nil, errors.New("error fetching limits: " + apiResponseModel.Error)
+	}
+	minTransferAmount, _ := new(big.Int).SetString(apiResponseModel.MinAmount, 10)
+	maxTransferAmount, _ := new(big.Int).SetString(apiResponseModel.MaxAmount, 10)
+	minTransferAmountUsd, _ := new(big.Int).SetString(apiResponseModel.MinAmountUSD, 10)
+	maxTransferAmountUsd, _ := new(big.Int).SetString(apiResponseModel.MaxAmountUSD, 10)
+	return &types.TransferLimits{
+		MinAmount:    minTransferAmount,
+		MaxAmount:    maxTransferAmount,
+		MinAmountUSD: minTransferAmountUsd,
+		MaxAmountUSD: maxTransferAmountUsd,
+	}, nil
 }
 
 func (sdk *SDK) initializeClaimLink(

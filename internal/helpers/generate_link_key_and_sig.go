@@ -19,6 +19,7 @@ func GenerateLinkKeyAndSignature(
 	if err != nil {
 		return
 	}
+	linkKeyId = crypto.PubkeyToAddress(linkKey.PublicKey)
 
 	senderSig, err = signTypedData(apitypes.TypedData{
 		Domain:      domain,
@@ -36,7 +37,7 @@ func GenerateLinkKeyAndSignature(
 			},
 		},
 		Message: map[string]any{
-			"linkKeyId":  crypto.PubkeyToAddress(linkKey.PublicKey).Hex(),
+			"linkKeyId":  linkKeyId.Hex(),
 			"transferId": transferId.Hex(),
 		},
 	})

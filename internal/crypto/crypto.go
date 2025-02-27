@@ -4,9 +4,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
-	"golang.org/x/crypto/sha3"
-
 	"golang.org/x/crypto/nacl/secretbox"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -45,32 +44,25 @@ func encodeTypeByte(t byte) []byte {
 // [type(1 byte), iv(24 bytes), sealed(...)] -> Hex encoded.
 func Encrypt(
 	message []byte,
-	symKey []byte,
-	iv []byte,
+	symKey [KeyLength]byte,
+	iv [NonceLength]byte,
 	getRandomBytes types.RandomBytesCallback,
 ) (encryptedMessage string, err error) {
-	if len(symKey) != KeyLength {
-		return "", errors.New("key must be 32 bytes (in hex)")
-	}
-
 	// Determine the IV (nonce)
-	if len(iv) == 0 {
-		iv = getRandomBytes(NonceLength)
-	}
-	if len(iv) != NonceLength {
-		return "", errors.New("iv must be 24 bytes")
+	if iv == [NonceLength]byte{} {
+		copy(iv[:], getRandomBytes(NonceLength))
 	}
 
 	// Encrypt the message with secretbox
-	var naclKey [32]byte
-	copy(naclKey[:], symKey)
+	var naclKey [KeyLength]byte
+	copy(naclKey[:], symKey[:])
 	var naclNonce [NonceLength]byte
-	copy(naclNonce[:], iv)
+	copy(naclNonce[:], iv[:])
 
 	sealed := secretbox.Seal(nil, message, &naclNonce, &naclKey)
 
 	// Combine [type(1 byte), iv(24 bytes), sealed(...)]
-	combined := append(encodeTypeByte(Type0), append(iv, sealed...)...)
+	combined := append(encodeTypeByte(Type0), append(iv[:], sealed...)...)
 	return toHex(combined), nil
 }
 
@@ -83,11 +75,7 @@ func Encrypt(
 //
 // Output:
 // - The decrypted message as a string, or an error in case of failure.
-func Decrypt(encoded string, symKey []byte) (string, error) {
-	if len(symKey) != KeyLength {
-		return "", errors.New("key must be 32 bytes (in hex)")
-	}
-
+func Decrypt(encoded string, symKey [KeyLength]byte) (string, error) {
 	// Decode the encrypted message from hex
 	encryptedBytes, err := fromHex(encoded)
 	if err != nil {
@@ -114,7 +102,7 @@ func Decrypt(encoded string, symKey []byte) (string, error) {
 
 	// Prepare nacl key and nonce
 	var naclKey [KeyLength]byte
-	copy(naclKey[:], symKey)
+	copy(naclKey[:], symKey[:])
 	var naclNonce [NonceLength]byte
 	copy(naclNonce[:], iv)
 

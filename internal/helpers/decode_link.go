@@ -12,24 +12,22 @@ import (
 	"strconv"
 )
 
-func defineSig(signatureLength int, signature string) string {
-	signatureB, err := base58.Decode(signature)
+func defineSig(signatureLength int, signatureHex string) []byte {
+	signature, err := base58.Decode(signatureHex)
 	if err != nil {
-		return ""
+		return []byte{}
 	}
-	originalSignature := hex.EncodeToString(signatureB)
 
-	// Ensure the hex string matches the desired length
-	paddedSignature := originalSignature
-	desiredLength := signatureLength * 2 // because each byte == 2 hex characters
-	if len(originalSignature) < desiredLength {
+	paddedSignature := make([]byte, signatureLength)
+
+	if len(signature) < signatureLength {
 		// Pad with zeros if shorter
-		paddedSignature = fmt.Sprintf("%0*s", desiredLength, originalSignature)
-	} else if len(originalSignature) > desiredLength {
-		// Trim extra characters if longer
-		paddedSignature = originalSignature[:desiredLength]
+		offset := signatureLength - len(signature)
+		copy(paddedSignature[offset:], signature)
+	} else {
+		signature = signature[:signatureLength]
 	}
-	return paddedSignature
+	return signature
 }
 
 func DecodeLink(link string) (*types.Link, error) {
@@ -109,12 +107,13 @@ func DecodeLink(link string) (*types.Link, error) {
 
 	// Handle optional encryptionKey
 	if params["encryptionKey"] != "" {
-		var ek []byte
-		ek, err = hex.DecodeString(params["encryptionKey"])
+		var ek [32]byte
+		ekDecoded, err := hex.DecodeString(params["encryptionKey"])
 		if err != nil {
 			return nil, errors.New("invalid encryptionKey value")
 		}
-		l.EncryptionKey = &ek
+		copy(ek[:], ekDecoded)
+		l.EncryptionKeyLinkParam = &ek
 	}
 
 	return l, nil

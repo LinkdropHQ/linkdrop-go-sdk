@@ -39,7 +39,7 @@ func (c *Client) RedeemRecoveredLink(
 	receiver common.Address,
 	transferId common.Address,
 	receiverSig []byte,
-	senderSig string, // Hex String
+	senderSig []byte,
 	sender common.Address,
 	escrow common.Address,
 	token types.Token,
@@ -50,7 +50,7 @@ func (c *Client) RedeemRecoveredLink(
 		"escrow":       escrow.Hex(),
 		"transfer_id":  transferId.Hex(),
 		"receiver_sig": "0x" + hex.EncodeToString(receiverSig),
-		"sender_sig":   "0x" + senderSig,
+		"sender_sig":   "0x" + hex.EncodeToString(senderSig),
 		"token":        token.Address.Hex(),
 	})
 	return helpers.Request(fmt.Sprintf("%s/redeem-recovered", c.config.apiURL), "POST", helpers.DefineHeaders(c.config.apiKey), body)
@@ -260,7 +260,7 @@ func (c *Client) Deposit(
 	escrow common.Address,
 	transferId common.Address,
 	expiration *big.Int,
-	txHash common.Hash,
+	transaction *types.Transaction,
 	fee types.CLFee,
 	amount *big.Int,
 	totalAmount *big.Int,
@@ -273,7 +273,8 @@ func (c *Client) Deposit(
 		"token":                    token.Address.Hex(),
 		"token_type":               string(token.Type),
 		"expiration":               expiration.String(),
-		"tx_hash":                  txHash.Hex(),
+		"tx_hash":                  transaction.Hash.Hex(),
+		"type":                     string(transaction.Type),
 		"fee_authorization":        "0x" + fee.Authorization,
 		"amount":                   amount.String(),
 		"fee_amount":               fee.Amount.String(),

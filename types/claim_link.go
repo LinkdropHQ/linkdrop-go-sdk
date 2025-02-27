@@ -110,18 +110,19 @@ type CLOperation struct {
 }
 
 type CLDepositParams struct {
-	Value *big.Int
-	Data  []byte
-	To    common.Address
+	ChainId ChainId
+	Value   *big.Int
+	Data    []byte
+	To      common.Address
 }
 
 type Link struct {
-	SenderSig              string
+	SenderSig              []byte
 	LinkKey                *ecdsa.PrivateKey
 	TransferId             common.Address
 	ChainId                ChainId
 	Version                string
-	EncryptionKey          *[]byte
-	EncryptionKeyLinkParam *[]byte
+	EncryptionKey          *[32]byte
+	EncryptionKeyLinkParam *[32]byte
 	Sender                 *common.Address
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"math/big"
+	"strconv"
 	"time"
 )
 
@@ -119,7 +120,6 @@ func (cl *ClaimLink) AddMessage(
 		cl.SDK.GetRandomBytes,
 		signTypedData,
 	)
-
 	return
 }
 
@@ -140,7 +140,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			"depositETH",
 			cl.TransferId,
 			cl.TotalAmount.String(),
-			cl.Expiration.String(), // TODO check expiration
+			cl.Expiration.String(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
 			senderMessage,
@@ -151,7 +151,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.Token.Address.Hex(),
 			cl.TransferId,
 			cl.TotalAmount.String(),
-			cl.Expiration.String(), // TODO check expiration
+			cl.Expiration.String(),
 			cl.Fee.Token.Address.Hex(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
@@ -163,7 +163,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.Token.Address.Hex(),
 			cl.TransferId,
 			cl.Token.Id.String(),
-			cl.Expiration.String(), // TODO check expiration
+			cl.Expiration.String(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
 			senderMessage,
@@ -174,7 +174,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.TransferId,
 			cl.Token.Id.String(),
 			cl.Amount,
-			cl.Expiration.String(), // TODO check expiration
+			cl.Expiration.String(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
 			senderMessage,
@@ -183,16 +183,16 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 		return nil, errors.New("invalid token type")
 	}
 
-	// Safely skip error check (if cl.Fee == nil) here
 	value, err := cl.defineValue()
 	if err != nil {
 		return nil, err
 	}
 
 	return &types.CLDepositParams{
-		Value: value,
-		Data:  data,
-		To:    cl.EscrowAddress,
+		ChainId: cl.Token.ChainId,
+		Value:   value,
+		Data:    data,
+		To:      cl.EscrowAddress,
 	}, nil
 }
 
@@ -231,7 +231,7 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 	if err != nil {
 		return txHash, err
 	}
-	if decodedLink.SenderSig != "" {
+	if decodedLink.SenderSig != nil {
 		bTxHash, err := cl.SDK.Client.RedeemRecoveredLink(
 			receiver,
 			cl.TransferId,
@@ -293,7 +293,9 @@ func (cl *ClaimLink) GetStatus() (types.CLItemStatus, []types.CLOperation, error
 	return claimLink.Status, claimLink.Operations, nil
 }
 
-func (cl *ClaimLink) DecryptSenderMessage() (message string, err error) {
+func (cl *ClaimLink) DecryptSenderMessage(
+	signTypedData types.SignTypedDataCallback,
+) (message string, err error) {
 	if !cl.validated {
 		return "", errors.New("claim link is not validated. Run Validate()")
 	}
@@ -303,10 +305,19 @@ func (cl *ClaimLink) DecryptSenderMessage() (message string, err error) {
 	if cl.EncryptedSenderMessage == nil {
 		return "", nil
 	}
-	return crypto.Decrypt(
-		cl.EncryptedSenderMessage.Message,
-		cl.EncryptedSenderMessage.EncryptionKey,
-	)
+	if cl.EncryptedSenderMessage.EncryptionKey == [crypto.KeyLength]byte{} {
+		encryptionKeyLength, err := strconv.ParseInt(cl.EncryptedSenderMessage.Message[:2], 16, 64)
+		cl.EncryptedSenderMessage.EncryptionKey, _, err = helpers.CreateMessageEncryptionKey(
+			cl.TransferId.Hex(),
+			signTypedData,
+			cl.Token.ChainId,
+			encryptionKeyLength,
+		)
+		if err != nil {
+			return "", err
+		}
+	}
+	return helpers.DecryptMessage(cl.EncryptedSenderMessage)
 }
 
 func (cl *ClaimLink) defineValue() (value *big.Int, err error) {
@@ -334,9 +345,10 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 	if cl.ForRecipient {
 		return txHash, transferId, claimUrl, errors.New("this link can only be redeemed")
 	}
+
 	params, err := cl.GetDepositParams()
 	if err != nil {
-		return txHash, transferId, claimUrl, err
+		return
 	}
 	if cl.Fee == nil {
 		cl.Fee = new(types.CLFee)
@@ -345,7 +357,7 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 		cl.EncryptedSenderMessage = new(types.EncryptedMessage)
 	}
 
-	txHash, err = sendTransaction(params.To, params.Value, params.Data)
+	transaction, err := sendTransaction(big.NewInt(int64(params.ChainId)), params.To, params.Value, params.Data)
 	if err != nil {
 		return txHash, transferId, claimUrl, err
 	}
@@ -356,7 +368,7 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 		cl.EscrowAddress,
 		cl.TransferId,
 		cl.Expiration,
-		txHash,
+		transaction,
 		*cl.Fee,
 		cl.Amount,
 		cl.TotalAmount,
@@ -365,16 +377,18 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 	if err != nil {
 		return txHash, transferId, claimUrl, err
 	}
+
 	var linkKey *ecdsa.PrivateKey
 	if cl.LinkKey != nil {
 		linkKey = cl.LinkKey
 	}
 	linkParams := types.Link{
-		LinkKey:       linkKey,
-		TransferId:    cl.TransferId,
-		ChainId:       cl.Token.ChainId,
-		Sender:        &cl.Sender,
-		EncryptionKey: &cl.EncryptedSenderMessage.EncryptionKey,
+		LinkKey:                linkKey,
+		TransferId:             cl.TransferId,
+		ChainId:                cl.Token.ChainId,
+		Sender:                 &cl.Sender,
+		EncryptionKey:          &cl.EncryptedSenderMessage.EncryptionKey,
+		EncryptionKeyLinkParam: &cl.EncryptedSenderMessage.EncryptionKeyLinkParam,
 	}
 
 	claimUrl = helpers.EncodeLink(
@@ -475,11 +489,12 @@ func (cl *ClaimLink) DepositWithAuthorization(
 		linkKey = cl.LinkKey
 	}
 	linkParams := types.Link{
-		LinkKey:       linkKey,
-		TransferId:    cl.TransferId,
-		ChainId:       cl.Token.ChainId,
-		Sender:        &cl.Sender,
-		EncryptionKey: &cl.EncryptedSenderMessage.EncryptionKey,
+		LinkKey:                linkKey,
+		TransferId:             cl.TransferId,
+		ChainId:                cl.Token.ChainId,
+		Sender:                 &cl.Sender,
+		EncryptionKey:          &cl.EncryptedSenderMessage.EncryptionKey,
+		EncryptionKeyLinkParam: &cl.EncryptedSenderMessage.EncryptionKeyLinkParam,
 	}
 
 	claimUrl = helpers.EncodeLink(
@@ -583,7 +598,7 @@ func (cl *ClaimLink) GenerateClaimUrl(signTypedData types.SignTypedDataCallback)
 		return
 	}
 	linkParams := types.Link{
-		SenderSig:  common.Bytes2Hex(senderSig),
+		SenderSig:  senderSig,
 		LinkKey:    linkKey,
 		TransferId: cl.TransferId,
 		ChainId:    cl.Token.ChainId,
