@@ -1,6 +1,7 @@
 package linkdrop
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/helpers"
@@ -83,7 +84,7 @@ func (sdk *SDK) CreateClaimLink(
 		expiration,
 		sender,
 		types.CLSourceP2P,
-		nil,
+		nil, nil, nil,
 	)
 }
 
@@ -155,9 +156,12 @@ func (sdk *SDK) initializeClaimLink(
 	sender common.Address,
 	source types.CLSource,
 	transferId *common.Address,
+	fee *types.CLFee,
+	totalAmount *big.Int,
 ) (claimLink *ClaimLink, err error) {
+	var pk *ecdsa.PrivateKey
 	if transferId == nil {
-		pk, err := helpers.PrivateKey(sdk.GetRandomBytes)
+		pk, err = helpers.PrivateKey(sdk.GetRandomBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -167,14 +171,23 @@ func (sdk *SDK) initializeClaimLink(
 		}
 		transferId = &address
 	}
+	if fee == nil || totalAmount == nil {
+		fee, totalAmount, err = sdk.GetCurrentFee(token, sender, *transferId, expiration, amount)
+		if err != nil {
+			return nil, err
+		}
+	}
 	claimLink = &ClaimLink{
-		SDK:        sdk,
-		Token:      token,
-		Amount:     amount,
-		Expiration: expiration,
-		Sender:     sender,
-		Source:     source,
-		TransferId: *transferId,
+		SDK:         sdk,
+		Token:       token,
+		Amount:      amount,
+		Expiration:  expiration,
+		Sender:      sender,
+		Source:      source,
+		TransferId:  *transferId,
+		LinkKey:     pk,
+		Fee:         fee,
+		TotalAmount: totalAmount,
 	}
 	err = claimLink.Validate()
 	return
@@ -186,7 +199,7 @@ func (sdk *SDK) GetCurrentFee(
 	transferId common.Address,
 	expiration *big.Int,
 	amount *big.Int,
-) (fee *big.Int, err error) {
+) (fee *types.CLFee, totalAmount *big.Int, err error) {
 	feeB, err := sdk.Client.GetFee(
 		token,
 		sender,
@@ -195,19 +208,33 @@ func (sdk *SDK) GetCurrentFee(
 		amount,
 	)
 	getFeeResp := &struct {
-		FeeAmount            []byte `json:"fee_amount"`
-		TotalAmount          []byte `json:"total_amount"`
-		FeeAuthorization     []byte `json:"fee_authorization"`
-		FeeToken             []byte `json:"fee_token"`
-		PendingTxs           []byte `json:"pending_txs"`
-		PendingBlocks        []byte `json:"pending_blocks"`
-		PendingTxSubmittedBn []byte `json:"pending_tx_submitted_bn"`
-		PendingTxSubmittedAt []byte `json:"pending_tx_submitted_at"`
-		MinTransferAmount    []byte `json:"min_transfer_amount"`
-		MaxTransferAmount    []byte `json:"max_transfer_amount"`
+		Success              bool           `json:"success"`
+		Error                string         `json:"string"`
+		FeeAmount            string         `json:"fee_amount"`
+		TotalAmount          string         `json:"total_amount"`
+		FeeAuthorization     string         `json:"fee_authorization"`
+		FeeToken             common.Address `json:"fee_token"`
+		MinTransferAmount    string         `json:"min_transfer_amount"`
+		MaxTransferAmount    string         `json:"max_transfer_amount"`
+		MinTransferAmountUsd string         `json:"min_transfer_amount_usd"`
+		MaxTransferAmountUsd string         `json:"max_transfer_amount_usd"`
 	}{}
 	err = json.Unmarshal(feeB, getFeeResp)
-	return &big.Int{}, err
+	if !getFeeResp.Success {
+		return nil, nil, errors.New("error fetching fee: " + getFeeResp.Error)
+	}
+
+	feeAmount, _ := (&big.Int{}).SetString(getFeeResp.FeeAmount, 10)
+	totalAmount, _ = (&big.Int{}).SetString(getFeeResp.TotalAmount, 10)
+	return &types.CLFee{
+		Token: types.Token{
+			Type:    types.TokenTypeERC20, // TODO always?
+			ChainId: token.ChainId,
+			Address: getFeeResp.FeeToken,
+		},
+		Amount:        feeAmount,
+		Authorization: getFeeResp.FeeAuthorization,
+	}, totalAmount, err
 }
 
 func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) {

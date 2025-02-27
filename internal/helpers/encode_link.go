@@ -8,6 +8,9 @@ import (
 )
 
 func EncodeLink(claimHost string, link types.Link) string {
+	if link.LinkKey == nil {
+		return ""
+	}
 	// Encode LinkKey and TransferId to Base58
 	linkKey := base58.Encode(link.LinkKey.D.Bytes())
 	transferId := base58.Encode(link.TransferId.Bytes())

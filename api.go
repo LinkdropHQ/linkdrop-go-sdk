@@ -175,6 +175,10 @@ func (c *Client) GetFee(
 	if amount == nil || expiration == nil {
 		return nil, fmt.Errorf("amount and expiration are required")
 	}
+	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
+	if err != nil {
+		return nil, err
+	}
 	tokenId := "0"
 	if token.Id != nil {
 		tokenId = token.Id.String()
@@ -188,7 +192,7 @@ func (c *Client) GetFee(
 		"expiration":    expiration.String(),
 		"token_id":      tokenId,
 	})
-	return helpers.Request(fmt.Sprintf("%s/fee?%s", c.config.apiURL, query), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+	return helpers.Request(fmt.Sprintf("%s/fee?%s", apiHost, query), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
 }
 
 // GetHistory fetches the history of transfers related to a token and sender's address.
@@ -266,6 +270,9 @@ func (c *Client) Deposit(
 	totalAmount *big.Int,
 	encryptedSenderMessage string,
 ) ([]byte, error) {
+	if expiration == nil || transaction == nil || amount == nil || totalAmount == nil {
+		return nil, fmt.Errorf("expiration, transaction, amount, and totalAmount are required")
+	}
 	bodyRaw := map[string]string{
 		"sender":                   sender.Hex(),
 		"escrow":                   escrow.Hex(),

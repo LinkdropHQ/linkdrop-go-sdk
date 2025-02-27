@@ -335,6 +335,7 @@ func (cl *ClaimLink) defineValue() (value *big.Int, err error) {
 	return cl.Fee.Amount, nil
 }
 
+// TODO What if cl.LinkKey == nil?
 func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txHash common.Hash, transferId common.Address, claimUrl string, err error) {
 	if !cl.validated {
 		return txHash, transferId, claimUrl, errors.New("claim link is not validated. Run Validate()")

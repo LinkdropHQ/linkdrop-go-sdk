@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	geth_types "github.com/ethereum/go-ethereum/core/types"
@@ -65,7 +66,12 @@ func SendTransaction(
 		return
 	}
 
-	gasLimit := uint64(21000)
+	gasLimit, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
+		From:  sender.From,
+		To:    &to,
+		Value: value,
+		Data:  data,
+	})
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to get gas price: %v", err)
