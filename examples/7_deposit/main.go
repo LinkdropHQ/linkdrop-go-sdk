@@ -50,6 +50,7 @@ func main() {
 		types.DeploymentCBW,
 		getRandomBytes,
 		linkdrop.WithApiKey(os.Getenv("LINKDROP_API_KEY")),
+		linkdrop.WithCoinbaseWalletProductionDefaults(),
 	)
 	if err != nil {
 		log.Fatalln(err)
@@ -75,5 +76,6 @@ func main() {
 	}
 	log.Println(url) // The link is valid, but can't be claimed since assets are were deposited
 
-	_, _, _, err = clERC20.Deposit(sendTransaction)
+	_, _, claimUrl, err := clERC20.Deposit(sendTransaction)
+	log.Println(claimUrl, err)
 }

@@ -42,5 +42,9 @@ func Request(url string, method string, headers http.Header, body []byte) ([]byt
 		return nil, err
 	}
 
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected status code: %d, response body: %s", resp.StatusCode, string(respBody))
+	}
+
 	return respBody, nil
 }

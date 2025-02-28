@@ -17,7 +17,7 @@ type CLFeeData struct {
 type CLFee struct {
 	Token         Token
 	Amount        *big.Int
-	Authorization string // TODO []byte
+	Authorization []byte
 }
 
 type CLSource string

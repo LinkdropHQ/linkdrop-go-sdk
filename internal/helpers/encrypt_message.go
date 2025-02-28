@@ -2,7 +2,9 @@ package helpers
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/crypto"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
@@ -27,6 +29,10 @@ func EncryptMessage(
 	getRandomBytes types.RandomBytesCallback,
 	signTypedData types.SignTypedDataCallback,
 ) (*types.EncryptedMessage, error) {
+	if encryptionKeyLength > 0xFFFF {
+		return nil, errors.New("encryptionKeyLength exceeds 2 bytes")
+	}
+
 	encryptionKey, _, err := CreateMessageEncryptionKey(transferID.Hex(), signTypedData, chainID, encryptionKeyLength)
 	if err != nil {
 		return nil, err
@@ -37,13 +43,12 @@ func EncryptMessage(
 		return nil, err
 	}
 
-	// Convert encryption key length to hexadecimal
-	encryptionKeyLengthAsHex := NumberToHexString(encryptionKeyLength)
+	encryptionKeyLengthB := make([]byte, 2)
+	binary.BigEndian.PutUint16(encryptionKeyLengthB, uint16(encryptionKeyLength))
 
 	// Build the result
 	result := &types.EncryptedMessage{
-		// Pack encryptionKeyLengthAsHex to Message to ensure compatability with existing LD infrastructure
-		Message:             fmt.Sprintf("%s%s", encryptionKeyLengthAsHex, encryptedSenderMessage),
+		Message:             append(encryptionKeyLengthB[:], encryptedSenderMessage...),
 		EncryptionKey:       encryptionKey,
 		EncryptionKeyLength: encryptionKeyLength,
 	}

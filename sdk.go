@@ -8,6 +8,7 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
+	"strings"
 )
 
 type SenderHistory struct {
@@ -233,7 +234,7 @@ func (sdk *SDK) GetCurrentFee(
 			Address: getFeeResp.FeeToken,
 		},
 		Amount:        feeAmount,
-		Authorization: getFeeResp.FeeAuthorization,
+		Authorization: common.Hex2Bytes(strings.TrimPrefix(getFeeResp.FeeAuthorization, "0x")),
 	}, totalAmount, err
 }
 

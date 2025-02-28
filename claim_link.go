@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"math/big"
-	"strconv"
+	"strings"
 	"time"
 )
 
@@ -127,12 +127,11 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 	if !cl.validated {
 		return nil, errors.New("claim link is not validated. Run Validate()")
 	}
+	if cl.EncryptedSenderMessage == nil {
+		cl.EncryptedSenderMessage = new(types.EncryptedMessage)
+	}
 
 	var data []byte
-	senderMessage := ""
-	if cl.EncryptedSenderMessage != nil {
-		senderMessage = "0x" + cl.EncryptedSenderMessage.Message
-	}
 
 	switch cl.Token.Type {
 	case types.TokenTypeNative:
@@ -143,19 +142,19 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.Expiration.String(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
-			senderMessage,
+			cl.EncryptedSenderMessage.Message,
 		)
 	case types.TokenTypeERC20:
 		data, err = constants.EscrowTokenAbi.Pack(
 			"deposit",
-			cl.Token.Address.Hex(),
+			cl.Token.Address,
 			cl.TransferId,
-			cl.TotalAmount.String(),
-			cl.Expiration.String(),
-			cl.Fee.Token.Address.Hex(),
-			cl.Fee.Amount.String(),
+			cl.TotalAmount,
+			cl.Expiration,
+			cl.Fee.Token.Address,
+			cl.Fee.Amount,
 			cl.Fee.Authorization,
-			senderMessage,
+			cl.EncryptedSenderMessage.Message,
 		)
 	case types.TokenTypeERC721:
 		data, err = constants.EscrowTokenAbi.Pack(
@@ -166,7 +165,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.Expiration.String(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
-			senderMessage,
+			cl.EncryptedSenderMessage.Message,
 		)
 	case types.TokenTypeERC1155:
 		data, err = constants.EscrowTokenAbi.Pack(
@@ -177,10 +176,13 @@ func (cl *ClaimLink) GetDepositParams() (params *types.CLDepositParams, err erro
 			cl.Expiration.String(),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
-			senderMessage,
+			cl.EncryptedSenderMessage.Message,
 		)
 	default:
 		return nil, errors.New("invalid token type")
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	value, err := cl.defineValue()
@@ -306,7 +308,7 @@ func (cl *ClaimLink) DecryptSenderMessage(
 		return "", nil
 	}
 	if cl.EncryptedSenderMessage.EncryptionKey == [crypto.KeyLength]byte{} {
-		encryptionKeyLength, err := strconv.ParseInt(cl.EncryptedSenderMessage.Message[:2], 16, 64)
+		encryptionKeyLength := int64(cl.EncryptedSenderMessage.Message[0])
 		cl.EncryptedSenderMessage.EncryptionKey, _, err = helpers.CreateMessageEncryptionKey(
 			cl.TransferId.Hex(),
 			signTypedData,
@@ -335,7 +337,6 @@ func (cl *ClaimLink) defineValue() (value *big.Int, err error) {
 	return cl.Fee.Amount, nil
 }
 
-// TODO What if cl.LinkKey == nil?
 func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txHash common.Hash, transferId common.Address, claimUrl string, err error) {
 	if !cl.validated {
 		return txHash, transferId, claimUrl, errors.New("claim link is not validated. Run Validate()")
@@ -606,7 +607,7 @@ func (cl *ClaimLink) GenerateClaimUrl(signTypedData types.SignTypedDataCallback)
 	}
 	if cl.EncryptedSenderMessage != nil && len(cl.EncryptedSenderMessage.Message) >= 2 {
 		// TODO double-check
-		encryptionKeyLength := int64(common.FromHex(cl.EncryptedSenderMessage.Message[:2])[0])
+		encryptionKeyLength := int64(cl.EncryptedSenderMessage.Message[0])
 		_, encryptionKeyLinkParam, err := helpers.CreateMessageEncryptionKey(
 			cl.TransferId.Hex(),
 			signTypedData,
@@ -688,7 +689,7 @@ func (cl *ClaimLink) getFee(amount *big.Int) (fee *types.CLFeeData, err error) {
 				Address: common.HexToAddress(feeRaw.FeeToken),
 			},
 			Amount:        feeAmount,
-			Authorization: feeRaw.FeeAuthorization,
+			Authorization: common.Hex2Bytes(strings.TrimPrefix(feeRaw.FeeAuthorization, "0x")),
 		},
 	}
 	return fee, nil

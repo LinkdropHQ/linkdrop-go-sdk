@@ -30,11 +30,6 @@ func fromHex(hexStr string) ([]byte, error) {
 	return bytes, nil
 }
 
-// Converts a byte array to a hex string.
-func toHex(data []byte) string {
-	return hex.EncodeToString(data)
-}
-
 // Encodes the type as a single byte.
 func encodeTypeByte(t byte) []byte {
 	return []byte{t}
@@ -47,7 +42,7 @@ func Encrypt(
 	symKey [KeyLength]byte,
 	iv [NonceLength]byte,
 	getRandomBytes types.RandomBytesCallback,
-) (encryptedMessage string, err error) {
+) (encryptedMessage []byte, err error) {
 	// Determine the IV (nonce)
 	if iv == [NonceLength]byte{} {
 		copy(iv[:], getRandomBytes(NonceLength))
@@ -63,7 +58,7 @@ func Encrypt(
 
 	// Combine [type(1 byte), iv(24 bytes), sealed(...)]
 	combined := append(encodeTypeByte(Type0), append(iv[:], sealed...)...)
-	return toHex(combined), nil
+	return combined, nil
 }
 
 // Decrypt decrypts a TYPE_0 formatted message using nacl.secretbox.
@@ -75,18 +70,14 @@ func Encrypt(
 //
 // Output:
 // - The decrypted message as a string, or an error in case of failure.
-func Decrypt(encoded string, symKey [KeyLength]byte) (string, error) {
+func Decrypt(encoded []byte, symKey [KeyLength]byte) (string, error) {
 	// Decode the encrypted message from hex
-	encryptedBytes, err := fromHex(encoded)
-	if err != nil {
-		return "", err
-	}
-	if len(encryptedBytes) < (TypeLength + NonceLength) {
+	if len(encoded) < (TypeLength + NonceLength) {
 		return "", errors.New("invalid encoded message format")
 	}
 
 	// Extract type byte (1st byte)
-	typeByte := encryptedBytes[0]
+	typeByte := encoded[0]
 	if typeByte != Type0 {
 		return "", errors.New("invalid type byte, expected TYPE_0")
 	}
@@ -94,11 +85,11 @@ func Decrypt(encoded string, symKey [KeyLength]byte) (string, error) {
 	// Extract the IV (nonce) and sealed data
 	ivStart := TypeLength
 	ivEnd := ivStart + NonceLength
-	iv := encryptedBytes[ivStart:ivEnd]
+	iv := encoded[ivStart:ivEnd]
 	if len(iv) != NonceLength {
 		return "", errors.New("invalid IV length")
 	}
-	sealed := encryptedBytes[ivEnd:]
+	sealed := encoded[ivEnd:]
 
 	// Prepare nacl key and nonce
 	var naclKey [KeyLength]byte

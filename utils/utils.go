@@ -65,6 +65,7 @@ func SendTransaction(
 	if err != nil {
 		return
 	}
+	log.Println("Nonce:", nonce)
 
 	gasLimit, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
 		From:  sender.From,
@@ -72,7 +73,11 @@ func SendTransaction(
 		Value: value,
 		Data:  data,
 	})
+	if err != nil {
+		gasLimit = 100000
+	}
 	gasPrice, err := client.SuggestGasPrice(context.Background())
+	gasPrice.Add(gasPrice, gasPrice)
 	if err != nil {
 		log.Fatalf("Failed to get gas price: %v", err)
 	}
