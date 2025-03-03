@@ -36,9 +36,9 @@ func main() {
 			Type:    types.TokenTypeNative,
 			ChainId: types.ChainIdBase,
 		},
-		big.NewInt(1000000000),
+		big.NewInt(250000000000000000),
 		common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-		big.NewInt(1000000000),
+		big.NewInt(1775195026),
 	)
 	if err != nil {
 		log.Fatalln(err)

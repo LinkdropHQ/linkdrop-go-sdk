@@ -70,12 +70,16 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	url, _, err := clERC20.GenerateClaimUrl(signTypedData)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	log.Println(url) // The link is valid, but can't be claimed since assets are were deposited
 
-	_, _, claimUrl, err := clERC20.Deposit(sendTransaction)
-	log.Println(claimUrl, err)
+	txHash, transferId, err := clERC20.Deposit(sendTransaction)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("TX Hash: ", txHash, "\n Transfer ID: ", transferId)
 }

@@ -337,15 +337,16 @@ func (cl *ClaimLink) defineValue() (value *big.Int, err error) {
 	return cl.Fee.Amount, nil
 }
 
-func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txHash common.Hash, transferId common.Address, claimUrl string, err error) {
+func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txHash common.Hash, transferId common.Address, err error) {
 	if !cl.validated {
-		return txHash, transferId, claimUrl, errors.New("claim link is not validated. Run Validate()")
+		return txHash, transferId, errors.New("claim link is not validated. Run Validate()")
 	}
 	if sendTransaction == nil {
-		return txHash, transferId, claimUrl, errors.New("sendTransaction callback is required")
+		err = errors.New("sendTransaction callback is required")
+		return
 	}
 	if cl.ForRecipient {
-		return txHash, transferId, claimUrl, errors.New("this link can only be redeemed")
+		return txHash, transferId, errors.New("this link can only be redeemed")
 	}
 
 	params, err := cl.GetDepositParams()
@@ -361,7 +362,7 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 
 	transaction, err := sendTransaction(big.NewInt(int64(params.ChainId)), params.To, params.Value, params.Data)
 	if err != nil {
-		return txHash, transferId, claimUrl, err
+		return
 	}
 
 	_, err = cl.SDK.Client.Deposit(
@@ -377,29 +378,10 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 		cl.EncryptedSenderMessage.Message,
 	)
 	if err != nil {
-		return txHash, transferId, claimUrl, err
+		return
 	}
-
-	var linkKey *ecdsa.PrivateKey
-	if cl.LinkKey != nil {
-		linkKey = cl.LinkKey
-	}
-	linkParams := types.Link{
-		LinkKey:                linkKey,
-		TransferId:             cl.TransferId,
-		ChainId:                cl.Token.ChainId,
-		Sender:                 &cl.Sender,
-		EncryptionKey:          &cl.EncryptedSenderMessage.EncryptionKey,
-		EncryptionKeyLinkParam: &cl.EncryptedSenderMessage.EncryptionKeyLinkParam,
-	}
-
-	claimUrl = helpers.EncodeLink(
-		cl.SDK.Client.config.apiURL,
-		linkParams,
-	)
-	cl.ClaimUrl = &claimUrl
 	cl.Status = types.CLItemStatusDeposited
-	return txHash, cl.TransferId, claimUrl, err
+	return transaction.Hash, cl.TransferId, err
 }
 
 func (cl *ClaimLink) IsDepositWithAuthorizationAvailable(address common.Address) bool {
@@ -566,12 +548,25 @@ func (cl *ClaimLink) UpdateAmount(amount *big.Int) (*types.CLFeeData, error) {
 	return feeData, nil
 }
 
+func (cl *ClaimLink) GenerateRecoveredClaimUrl(
+	signTypedData types.SignTypedDataCallback,
+) (link string, transferId common.Address, err error) {
+	return cl.generateClaimUrl(true, signTypedData)
+}
+
 func (cl *ClaimLink) GenerateClaimUrl(signTypedData types.SignTypedDataCallback) (link string, transferId common.Address, err error) {
-	if !cl.validated {
-		return "", types.ZeroAddress, errors.New("claim link is not validated. Run Validate()")
-	}
+	return cl.generateClaimUrl(false, signTypedData)
+}
+
+func (cl *ClaimLink) generateClaimUrl(
+	linkRecover bool,
+	signTypedData types.SignTypedDataCallback,
+) (link string, transferId common.Address, err error) {
 	if signTypedData == nil {
 		return "", types.ZeroAddress, errors.New("signTypedData callback is required")
+	}
+	if !cl.validated {
+		return "", types.ZeroAddress, errors.New("claim link is not validated. Run Validate()")
 	}
 	if cl.ForRecipient {
 		return "", types.ZeroAddress, errors.New("this link can only be redeemed")
@@ -590,29 +585,43 @@ func (cl *ClaimLink) GenerateClaimUrl(signTypedData types.SignTypedDataCallback)
 		ChainId:           math.NewHexOrDecimal256(int64(cl.Token.ChainId)),
 		VerifyingContract: cl.EscrowAddress.Hex(),
 	}
-	linkKey, _, senderSig, err := helpers.GenerateLinkKeyAndSignature(
-		signTypedData,
-		cl.SDK.GetRandomBytes,
-		cl.TransferId,
-		*escrowPaymentDomain,
-	)
-	if err != nil {
-		return
+
+	var linkKeyId common.Address
+	var senderSig []byte
+	// If link key doesn't exist it's a new link or a recovered one
+	// recover == true forces re-generation
+	if cl.LinkKey == nil || linkRecover {
+		// Just a new link
+		cl.LinkKey, linkKeyId, err = helpers.GenerateLinkKey(
+			cl.SDK.GetRandomBytes,
+		)
+		if err != nil {
+			return
+		}
 	}
+	// If recover - the link key was re-generated so we include sig
+	if linkRecover {
+		senderSig, err = helpers.GenerateLinkSignature(
+			linkKeyId,
+			signTypedData,
+			cl.TransferId,
+			*escrowPaymentDomain,
+		)
+	}
+
 	linkParams := types.Link{
-		SenderSig:  senderSig,
-		LinkKey:    linkKey,
+		LinkKey:    cl.LinkKey,
 		TransferId: cl.TransferId,
 		ChainId:    cl.Token.ChainId,
+		SenderSig:  senderSig,
+		Sender:     &cl.Sender,
 	}
 	if cl.EncryptedSenderMessage != nil && len(cl.EncryptedSenderMessage.Message) >= 2 {
-		// TODO double-check
-		encryptionKeyLength := int64(cl.EncryptedSenderMessage.Message[0])
 		_, encryptionKeyLinkParam, err := helpers.CreateMessageEncryptionKey(
 			cl.TransferId.Hex(),
 			signTypedData,
 			cl.Token.ChainId,
-			encryptionKeyLength,
+			int64(len(cl.EncryptedSenderMessage.EncryptionKey)),
 		)
 		if err != nil {
 			return "", types.ZeroAddress, err

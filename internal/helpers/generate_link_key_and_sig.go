@@ -8,19 +8,25 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
-func GenerateLinkKeyAndSignature(
-	signTypedData types.SignTypedDataCallback,
+func GenerateLinkKey(
 	getRandomBytes types.RandomBytesCallback,
-	transferId common.Address,
-	domain apitypes.TypedDataDomain,
-) (linkKey *ecdsa.PrivateKey, linkKeyId common.Address, senderSig []byte, err error) {
-
+) (linkKey *ecdsa.PrivateKey, linkKeyId common.Address, err error) {
 	linkKey, err = PrivateKey(getRandomBytes)
 	if err != nil {
 		return
 	}
 	linkKeyId = crypto.PubkeyToAddress(linkKey.PublicKey)
+	return
+}
 
+// GenerateLinkSignature
+// NOTE: Usually will be called after GenerateLinkKey if signature is needed
+func GenerateLinkSignature(
+	linkKeyId common.Address,
+	signTypedData types.SignTypedDataCallback,
+	transferId common.Address,
+	domain apitypes.TypedDataDomain,
+) (senderSig []byte, err error) {
 	senderSig, err = signTypedData(apitypes.TypedData{
 		Domain:      domain,
 		PrimaryType: "Transfer",

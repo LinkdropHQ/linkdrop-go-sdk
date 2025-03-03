@@ -10,12 +10,13 @@ import (
 	"github.com/mr-tron/base58"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 func defineSig(signatureLength int, signatureHex string) []byte {
 	signature, err := base58.Decode(signatureHex)
 	if err != nil {
-		return []byte{}
+		return nil
 	}
 
 	paddedSignature := make([]byte, signatureLength)
@@ -31,20 +32,26 @@ func defineSig(signatureLength int, signatureHex string) []byte {
 }
 
 func DecodeLink(link string) (*types.Link, error) {
-	urlParts, err := url.ParseQuery(link)
+	queryArgs, err := url.ParseQuery(link)
+	if strings.Contains(link, "/#/") {
+		parsedLink, _ := url.Parse(link)
+		queryArgs, err = url.ParseQuery(strings.Split(parsedLink.Fragment, "?")[1])
+	} else {
+		queryArgs, err = url.ParseQuery(link)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse query parameters: %w", err)
 	}
 
 	// Extract parameters with defaults if not present
 	params := map[string]string{
-		"linkKey":         urlParts.Get("k"),
-		"signature":       urlParts.Get("sg"),
-		"transferId":      urlParts.Get("i"),
-		"chainId":         urlParts.Get("c"),
-		"version":         urlParts.Get("v"),
-		"signatureLength": urlParts.Get("sgl"),
-		"encryptionKey":   urlParts.Get("m"),
+		"linkKey":         queryArgs.Get("k"),
+		"signature":       queryArgs.Get("sg"),
+		"transferId":      queryArgs.Get("i"),
+		"chainId":         queryArgs.Get("c"),
+		"version":         queryArgs.Get("v"),
+		"signatureLength": queryArgs.Get("sgl"),
+		"encryptionKey":   queryArgs.Get("m"),
 	}
 
 	// Set default values for version and signature length

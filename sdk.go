@@ -208,6 +208,9 @@ func (sdk *SDK) GetCurrentFee(
 		expiration,
 		amount,
 	)
+	if err != nil {
+		return
+	}
 	getFeeResp := &struct {
 		Success              bool           `json:"success"`
 		Error                string         `json:"string"`
@@ -227,9 +230,13 @@ func (sdk *SDK) GetCurrentFee(
 
 	feeAmount, _ := (&big.Int{}).SetString(getFeeResp.FeeAmount, 10)
 	totalAmount, _ = (&big.Int{}).SetString(getFeeResp.TotalAmount, 10)
+	tokenType := types.TokenTypeERC20
+	if getFeeResp.FeeToken == types.ZeroAddress {
+		tokenType = types.TokenTypeNative
+	}
 	return &types.CLFee{
 		Token: types.Token{
-			Type:    types.TokenTypeERC20, // TODO always?
+			Type:    tokenType,
 			ChainId: token.ChainId,
 			Address: getFeeResp.FeeToken,
 		},
@@ -267,10 +274,16 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 	}
 
 	cl := respModel.ClaimLink
+	tokenType := types.TokenType(cl["token_type"].(string))
+
 	tokenId, ok := new(big.Int).SetString(cl["token_id"].(string), 10)
 	if !ok {
 		return nil, errors.New("invalid token_id")
 	}
+	if !(tokenType == types.TokenTypeERC721 || tokenType == types.TokenTypeERC1155) {
+		tokenId = nil
+	}
+
 	amount, ok := new(big.Int).SetString(cl["amount"].(string), 10)
 	if !ok {
 		return nil, errors.New("invalid amount")
@@ -294,7 +307,7 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 		Sender:  common.HexToAddress(cl["sender"].(string)),
 		ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
 		Token: types.Token{
-			Type:    types.TokenType(cl["token_type"].(string)),
+			Type:    tokenType,
 			ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
 			Address: common.HexToAddress(cl["token"].(string)),
 			Id:      tokenId,

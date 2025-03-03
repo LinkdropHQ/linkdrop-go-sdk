@@ -18,7 +18,7 @@ func EncodeLink(claimHost string, link types.Link) string {
 	// Handle optional encryption key
 	var encryptionKey string
 	if link.EncryptionKeyLinkParam != nil && *link.EncryptionKeyLinkParam != [32]byte{} {
-		encryptionKey = fmt.Sprintf("&m=0x%x", link.EncryptionKeyLinkParam)
+		encryptionKey = fmt.Sprintf("&m=0x%x", *link.EncryptionKeyLinkParam)
 	}
 	chainId := strconv.Itoa(int(link.ChainId))
 
