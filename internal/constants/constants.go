@@ -19,10 +19,10 @@ var (
 var SupportedStableCoins = map[common.Address]Selector{
 	TAUsdcBase:           SelectorReceiveWithAuthorization,
 	TAEurcBase:           SelectorReceiveWithAuthorization,
+	TACbBtcBase:          SelectorReceiveWithAuthorizationEOA,
 	TAUsdcBridgedPolygon: SelectorApproveWithAuthorization,
 	TAUsdcPolygon:        SelectorReceiveWithAuthorization,
 	TAUsdcArbitrum:       SelectorReceiveWithAuthorization,
 	TAUsdcOptimism:       SelectorReceiveWithAuthorization,
 	TAUsdcAvalanche:      SelectorReceiveWithAuthorizationEOA,
-	TACbBTC:              SelectorReceiveWithAuthorizationEOA,
 }

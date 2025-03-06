@@ -391,9 +391,13 @@ func (cl *ClaimLink) IsDepositWithAuthorizationAvailable(address common.Address)
 func (cl *ClaimLink) DepositWithAuthorization(
 	signTypedData types.SignTypedDataCallback,
 	authConfig *types.AuthorizationConfig,
-) (txHash common.Hash, transferId common.Address, claimUrl string, err error) {
+) (txHash common.Hash, transferId common.Address, err error) {
 	if !cl.validated {
 		err = errors.New("claim link is not validated. Run Validate()")
+		return
+	}
+	if signTypedData == nil {
+		err = errors.New("signTypedData callback is required")
 		return
 	}
 	if cl.Expiration == nil {
@@ -404,15 +408,6 @@ func (cl *ClaimLink) DepositWithAuthorization(
 		err = errors.New("amount is not defined for claim link")
 		return
 	}
-	if signTypedData == nil {
-		err = errors.New("signTypedData callback is required")
-		return
-	}
-	if authConfig == nil {
-		// TODO implement
-		err = errors.New("authorization config is required")
-		return
-	}
 	if cl.Status >= types.CLItemStatusDeposited {
 		err = errors.New("can't deposit with authorization for claim link with status " + cl.Status.String())
 		return
@@ -421,14 +416,26 @@ func (cl *ClaimLink) DepositWithAuthorization(
 		err = errors.New("can't deposit with authorization for native token")
 		return
 	}
-	// TODO double-check
-	if cl.LinkKey != nil {
-		err = errors.New("can't deposit with authorization for claim link with link key")
-		return
-	}
-	authSelector, err := authConfig.AuthorizationMethod.Selector()
-	if err != nil {
-		return
+
+	var authSelector string
+	if authConfig == nil {
+		domain, err := helpers.DefineDomain(cl.Token)
+		if err != nil {
+			return txHash, transferId, err
+		}
+		authConfig = &types.AuthorizationConfig{
+			Domain: domain,
+		}
+		authSelector = string(constants.SupportedStableCoins[cl.Token.Address])
+	} else {
+		if authConfig.AuthorizationMethod == nil {
+			err = errors.New("authorization method is not defined for authorization config")
+			return
+		}
+		authSelector, err = authConfig.AuthorizationMethod.Selector()
+		if err != nil {
+			return
+		}
 	}
 	now := time.Now().Unix()
 	validAfter := now - 60*60
@@ -452,6 +459,10 @@ func (cl *ClaimLink) DepositWithAuthorization(
 		return
 	}
 
+	var message []byte
+	if cl.EncryptedSenderMessage != nil {
+		message = cl.EncryptedSenderMessage.Message // signing key len included [2:] to remove
+	}
 	result, err := cl.SDK.Client.DepositWithAuthorization(
 		cl.Token,
 		cl.Sender,
@@ -463,31 +474,14 @@ func (cl *ClaimLink) DepositWithAuthorization(
 		*cl.Fee,
 		cl.Amount,
 		cl.TotalAmount,
-		cl.EncryptedSenderMessage.Message,
+		message,
 	)
 	if err != nil {
 		return
 	}
-	var linkKey *ecdsa.PrivateKey
-	if cl.LinkKey != nil {
-		linkKey = cl.LinkKey
-	}
-	linkParams := types.Link{
-		LinkKey:                linkKey,
-		TransferId:             cl.TransferId,
-		ChainId:                cl.Token.ChainId,
-		Sender:                 &cl.Sender,
-		EncryptionKey:          &cl.EncryptedSenderMessage.EncryptionKey,
-		EncryptionKeyLinkParam: &cl.EncryptedSenderMessage.EncryptionKeyLinkParam,
-	}
 
-	claimUrl = helpers.EncodeLink(
-		cl.SDK.Client.config.apiURL,
-		linkParams,
-	)
-	cl.ClaimUrl = &claimUrl
 	cl.Status = types.CLItemStatusDeposited
-	return common.BytesToHash(result), cl.TransferId, claimUrl, err
+	return common.BytesToHash(result), cl.TransferId, err
 }
 
 func (cl *ClaimLink) GetCurrentFee() (fee *types.CLFeeData, err error) {

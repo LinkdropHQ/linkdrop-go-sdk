@@ -7,6 +7,7 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"log"
 	"math/big"
 )
 
@@ -333,23 +334,28 @@ func (c *Client) DepositWithAuthorization(
 	if expiration == nil || authorization == nil || amount == nil || totalAmount == nil {
 		return nil, fmt.Errorf("expiration, authorization, amount, and totalAmount are required")
 	}
-	body, err := json.Marshal(map[string]string{
-		"sender":                   sender.Hex(),
-		"escrow":                   escrow.Hex(),
-		"transfer_id":              transferId.Hex(),
-		"token":                    token.Address.Hex(),
-		"token_type":               string(token.Type),
-		"expiration":               expiration.String(),
-		"amount":                   amount.String(),
-		"authorization":            "0x" + hex.EncodeToString(authorization),
-		"authorization_selector":   authorizationSelector,
-		"fee_amount":               fee.Amount.String(),
-		"total_amount":             totalAmount.String(),
-		"fee_authorization":        "0x" + helpers.ToHex(fee.Authorization),
-		"encrypted_sender_message": helpers.ToHex(encryptedSenderMessage),
-	})
+	bodyRaw := map[string]string{
+		"sender":                 sender.Hex(),
+		"escrow":                 escrow.Hex(),
+		"transfer_id":            transferId.Hex(),
+		"token":                  token.Address.Hex(),
+		"token_type":             string(token.Type),
+		"expiration":             expiration.String(),
+		"amount":                 amount.String(),
+		"authorization":          "0x" + hex.EncodeToString(authorization),
+		"authorization_selector": authorizationSelector,
+		"fee_amount":             fee.Amount.String(),
+		"total_amount":           totalAmount.String(),
+		"fee_authorization":      "0x" + helpers.ToHex(fee.Authorization),
+	}
+	if encryptedSenderMessage != nil {
+		bodyRaw["encrypted_sender_message"] = helpers.ToHex(encryptedSenderMessage)
+	}
+	body, err := json.Marshal(bodyRaw)
+	log.Println(string(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
-	return helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	resp, err := helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	return resp, err
 }

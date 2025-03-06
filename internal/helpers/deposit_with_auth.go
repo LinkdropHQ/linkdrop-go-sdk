@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/constants"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
@@ -8,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"log"
 	"math/big"
 	"strings"
 )
@@ -113,7 +115,13 @@ func getDepositAuthorizationApprove(
 	signature, err := signTypedData(apitypes.TypedData{
 		Domain:      domain,
 		PrimaryType: "ApproveWithAuthorization",
-		Types: map[string][]apitypes.Type{
+		Types: apitypes.Types{
+			"EIP712Domain": {
+				{Name: "name", Type: "string"},
+				{Name: "version", Type: "string"},
+				{Name: "chainId", Type: "uint256"},
+				{Name: "verifyingContract", Type: "address"},
+			},
 			"ApproveWithAuthorization": {
 				{Type: "address", Name: "owner"},
 				{Type: "address", Name: "spender"},
@@ -178,22 +186,33 @@ func getDepositAuthorizationReceive(
 ) ([]byte, error) {
 
 	// Compute the nonce
-	nonce := crypto.Keccak256Hash([]byte(fmt.Sprintf("%s%s%s%s%s", sender.Hex(), transferId.Hex(), amount.String(), expiration.String(), feeAmount.String())))
-
-	message := map[string]interface{}{
-		"from":        sender,
-		"to":          to,
+	var nonce [32]byte
+	copy(
+		nonce[:],
+		crypto.Keccak256Hash(
+			[]byte(fmt.Sprintf("%s%s%s%s%s", sender.Hex(), transferId.Hex(), amount.String(), expiration.String(), feeAmount.String())),
+		).Bytes()[:],
+	)
+	message := apitypes.TypedDataMessage{
+		"from":        sender.Hex(),
+		"to":          to.Hex(),
 		"value":       amount,
-		"validAfter":  validAfter,
-		"validBefore": validBefore,
-		"nonce":       nonce.Bytes(),
+		"validAfter":  big.NewInt(validAfter),
+		"validBefore": big.NewInt(validBefore),
+		"nonce":       nonce,
 	}
 
 	// Sign the typed data
 	signature, err := signTypedData(apitypes.TypedData{
 		Domain:      domain,
 		PrimaryType: "ReceiveWithAuthorization",
-		Types: map[string][]apitypes.Type{
+		Types: apitypes.Types{
+			"EIP712Domain": {
+				{Name: "name", Type: "string"},
+				{Name: "version", Type: "string"},
+				{Name: "chainId", Type: "uint256"},
+				{Name: "verifyingContract", Type: "address"},
+			},
 			"ReceiveWithAuthorization": {
 				{Name: "from", Type: "address"},
 				{Name: "to", Type: "address"},
@@ -209,13 +228,11 @@ func getDepositAuthorizationReceive(
 		return []byte{}, fmt.Errorf("failed to sign typed data: %w", err)
 	}
 
-	// Prepare for ABI encoding
-	abiJSON := `[{"name":"ReceiveWithAuthorization","type":"function","inputs":[{"name":"from","type":"address"},{"name":"to","type":"address"},{"name":"value","type":"uint256"},{"name":"validAfter","type":"uint256"},{"name":"validBefore","type":"uint256"},{"name":"nonce","type":"bytes32"},{"name":"v","type":"uint8"},{"name":"r","type":"bytes32"},{"name":"s","type":"bytes32"},{"name":"signature","type":"bytes"}]}]`
-	contractAbi, err := abi.JSON(strings.NewReader(abiJSON))
-	if err != nil {
-		return []byte{}, fmt.Errorf("failed to parse ABI JSON: %w", err)
-	}
+	x, _ := json.Marshal(message)
+	log.Println(string(x))
+	log.Println(ToHex(nonce[:]))
 
+	// Handling legacy receiveWithAuthorization - the signature should be provided as v, r, s
 	if authSelector == constants.SelectorReceiveWithAuthorizationEOA {
 		// Legacy format: split signature
 		if len(signature) != 65 {
@@ -225,8 +242,15 @@ func getDepositAuthorizationReceive(
 		s := signature[32:64]
 		v := uint8(signature[64]) + 27 // Ethereum-specific adjustment for "v"
 
+		// Prepare for ABI encoding
+		abiJSON := `[{"name":"receiveWithAuthorization","type":"function","inputs":[{"name":"from","type":"address"},{"name":"to","type":"address"},{"name":"value","type":"uint256"},{"name":"validAfter","type":"uint256"},{"name":"validBefore","type":"uint256"},{"name":"nonce","type":"bytes32"},{"name":"v","type":"uint8"},{"name":"r","type":"bytes32"},{"name":"s","type":"bytes32"}}]}]`
+		contractAbi, err := abi.JSON(strings.NewReader(abiJSON))
+		if err != nil {
+			return []byte{}, fmt.Errorf("failed to parse ABI JSON: %w", err)
+		}
+
 		// Encode using ABI
-		authorizationData, err := contractAbi.Pack("ReceiveWithAuthorization",
+		authorizationData, err := contractAbi.Pack("receiveWithAuthorization",
 			message["from"],
 			message["to"],
 			message["value"],
@@ -242,18 +266,25 @@ func getDepositAuthorizationReceive(
 		}
 		return authorizationData, nil
 	}
+
+	// Prepare for ABI encoding
+	abiJSON := `[{"name":"receiveWithAuthorization","type":"function","inputs":[{"name":"from","type":"address"},{"name":"to","type":"address"},{"name":"value","type":"uint256"},{"name":"validAfter","type":"uint256"},{"name":"validBefore","type":"uint256"},{"name":"nonce","type":"bytes32"},{"name":"signature","type":"bytes"}]}]`
+	contractAbi, err := abi.JSON(strings.NewReader(abiJSON))
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to parse ABI JSON: %w", err)
+	}
 	// Modern format: include full signature as bytes
-	authorizationData, err := contractAbi.Pack("ReceiveWithAuthorization",
-		message["from"],
-		message["to"],
-		message["value"],
-		message["validAfter"],
-		message["validBefore"],
-		message["nonce"],
+	authorizationData, err := contractAbi.Pack("receiveWithAuthorization",
+		common.HexToAddress(message["from"].(string)),
+		common.HexToAddress(message["to"].(string)),
+		message["value"].(*big.Int),
+		message["validAfter"].(*big.Int),
+		message["validBefore"].(*big.Int),
+		message["nonce"].([32]byte),
 		signature,
 	)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to encode modern authorization: %w", err)
+		return []byte{}, fmt.Errorf("failed to encode authorization: %w", err)
 	}
 	return authorizationData, nil
 }
