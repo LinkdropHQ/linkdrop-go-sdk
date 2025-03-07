@@ -296,9 +296,6 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 	if err != nil {
 		return
 	}
-	if cl.Message == nil {
-		cl.Message = new(types.EncryptedMessage)
-	}
 
 	transaction, err := sendTransaction(big.NewInt(int64(params.ChainId)), params.To, params.Value, params.Data)
 	if err != nil {
