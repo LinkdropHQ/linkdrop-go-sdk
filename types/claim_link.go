@@ -2,127 +2,104 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
 )
 
-type CLFeeData struct {
-	Amount            *big.Int `json:"amount"`
-	TotalAmount       *big.Int `json:"total_amount"`
-	MaxTransferAmount *big.Int `json:"max_transfer_amount"`
-	MinTransferAmount *big.Int `json:"min_transfer_amount"`
-	Fee               CLFee    `json:"fee"`
-}
-
-type CLFee struct {
+type ClaimLinkFee struct {
 	Token         Token
 	Amount        *big.Int
 	Authorization []byte
 }
 
-type CLSource string
-
-const (
-	CLSourceUndefined CLSource = ""
-	CLSourceD         CLSource = "d"
-	CLSourceP2P       CLSource = "p2p"
-)
-
-type CLItemStatus int64
-
-const (
-	CLItemStatusUndefined CLItemStatus = iota
-	CLItemStatusCreated
-	CLItemStatusDepositing
-	CLItemStatusDeposited
-	CLItemStatusRedeeming
-	CLItemStatusRedeemed
-	CLItemStatusRefunding
-	CLItemStatusRefunded
-	CLItemStatusCancelled
-	CLItemStatusError
-)
-
-func ClItemStatusFromString(itemStatus string) CLItemStatus {
-	switch itemStatus {
-	case "created":
-		return CLItemStatusCreated
-	case "depositing":
-		return CLItemStatusDepositing
-	case "deposited":
-		return CLItemStatusDeposited
-	case "redeeming":
-		return CLItemStatusRedeeming
-	case "redeemed":
-		return CLItemStatusRedeemed
-	case "refunding":
-		return CLItemStatusRefunding
-	case "refunded":
-		return CLItemStatusRefunded
-	case "cancelled":
-		return CLItemStatusCancelled
-	case "error":
-		return CLItemStatusError
+func (clf *ClaimLinkFee) Validate() error {
+	if !(clf.Token.Type == TokenTypeNative || clf.Token.Type == TokenTypeERC20) {
+		return errors.New("fee token type is invalid, should be one of: native, ERC20")
 	}
-	return CLItemStatusUndefined
+	return clf.Token.Validate()
 }
 
-func (clis CLItemStatus) String() string {
+type ClaimLinkFeeData struct {
+	Amount            *big.Int     `json:"amount"`
+	TotalAmount       *big.Int     `json:"total_amount"`
+	MaxTransferAmount *big.Int     `json:"max_transfer_amount"`
+	MinTransferAmount *big.Int     `json:"min_transfer_amount"`
+	Fee               ClaimLinkFee `json:"fee"`
+}
+
+type ClaimLinkStatus int64
+
+const (
+	ClaimLinkStatusUndefined ClaimLinkStatus = iota
+	ClaimLinkStatusCreated
+	ClaimLinkStatusDepositing
+	ClaimLinkStatusDeposited
+	ClaimLinkStatusRedeeming
+	ClaimLinkStatusRedeemed
+	ClaimLinkStatusRefunding
+	ClaimLinkStatusRefunded
+	ClaimLinkStatusCancelled
+	ClaimLinkStatusError
+)
+
+func (clis ClaimLinkStatus) String() string {
 	switch clis {
-	case CLItemStatusUndefined:
+	case ClaimLinkStatusUndefined:
 		return ""
-	case CLItemStatusCreated:
+	case ClaimLinkStatusCreated:
 		return "created"
-	case CLItemStatusDepositing:
+	case ClaimLinkStatusDepositing:
 		return "depositing"
-	case CLItemStatusDeposited:
+	case ClaimLinkStatusDeposited:
 		return "deposited"
-	case CLItemStatusRedeeming:
+	case ClaimLinkStatusRedeeming:
 		return "redeeming"
-	case CLItemStatusRedeemed:
+	case ClaimLinkStatusRedeemed:
 		return "redeemed"
-	case CLItemStatusRefunding:
+	case ClaimLinkStatusRefunding:
 		return "refunding"
-	case CLItemStatusRefunded:
+	case ClaimLinkStatusRefunded:
 		return "refunded"
-	case CLItemStatusCancelled:
+	case ClaimLinkStatusCancelled:
 		return "cancelled"
-	case CLItemStatusError:
+	case ClaimLinkStatusError:
 		return "error"
 	}
 	return ""
 }
 
-type CLOperationStatus string
+type ClaimLinkOperationStatus string
 
 const (
-	CLOperationStatusPending   CLOperationStatus = "pending"
-	CLOperationStatusCompleted CLOperationStatus = "completed"
-	CLOperationStatusError     CLOperationStatus = "error"
+	LinkOperationStatusPending   ClaimLinkOperationStatus = "pending"
+	LinkOperationStatusCompleted ClaimLinkOperationStatus = "completed"
+	LinkOperationStatusError     ClaimLinkOperationStatus = "error"
 )
 
-type CLOperation struct {
-	Type      string            `json:"type"`
-	Timestamp string            `json:"timestamp"`
-	Status    CLOperationStatus `json:"status"`
-	Receiver  common.Address    `json:"receiver"`
-	TxHash    *common.Hash      `json:"txHash"`
+type ClaimLinkOperation struct {
+	Type      string                   `json:"type"`
+	Timestamp string                   `json:"timestamp"`
+	Status    ClaimLinkOperationStatus `json:"status"`
+	Receiver  common.Address           `json:"receiver"`
+	TxHash    *common.Hash             `json:"txHash"`
 }
 
-type CLDepositParams struct {
+type ClaimLinkDepositParams struct {
 	ChainId ChainId
 	Value   *big.Int
 	Data    []byte
 	To      common.Address
 }
 
+// Link
+// Represents the parsed structure of the link
 type Link struct {
-	SenderSig              []byte
-	LinkKey                *ecdsa.PrivateKey
-	TransferId             common.Address
-	ChainId                ChainId
-	Version                string
-	EncryptionKey          *[32]byte
-	EncryptionKeyLinkParam *[32]byte
-	Sender                 *common.Address
+	SenderSignature []byte
+	LinkKey         ecdsa.PrivateKey
+	TransferId      common.Address
+	ChainId         ChainId
+	Version         string
+	Message         *EncryptedMessage
+	Sender          *common.Address
 }

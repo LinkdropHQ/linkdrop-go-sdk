@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/helpers"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
@@ -12,8 +12,12 @@ import (
 )
 
 type SenderHistory struct {
-	ClaimLinks []ClaimLink     `json:"claimLinks"`
-	ResultSet  types.ResultSet `json:"resultSet"`
+	ClaimLinks []ClaimLink `json:"claimLinks"`
+	ResultSet  struct {
+		Total  int64 `json:"total"`
+		Limit  int64 `json:"limit"`
+		Offset int64 `json:"offset"`
+	} `json:"resultSet"`
 }
 
 type SDK struct {
@@ -60,7 +64,7 @@ func (sdk *SDK) GetVersionFromEscrowContract(escrowAddress common.Address) (stri
 	return helpers.DefineEscrowVersion(escrowAddress)
 }
 
-func (sdk *SDK) GetLinkSourceFromClaimUrl(claimUrl string) (types.CLSource, error) {
+func (sdk *SDK) GetLinkSourceFromClaimUrl(claimUrl string) (types.LinkSource, error) {
 	return helpers.LinkSourceFromClaimUrl(claimUrl)
 }
 
@@ -84,7 +88,7 @@ func (sdk *SDK) CreateClaimLink(
 		amount,
 		expiration,
 		sender,
-		types.CLSourceP2P,
+		types.LinkSourceP2P,
 		nil, nil, nil,
 	)
 }
@@ -157,7 +161,7 @@ func (sdk *SDK) initializeClaimLink(
 	sender common.Address,
 	source types.CLSource,
 	transferId *common.Address,
-	fee *types.CLFee,
+	fee *types.ClaimLinkFee,
 	totalAmount *big.Int,
 ) (claimLink *ClaimLink, err error) {
 	var pk *ecdsa.PrivateKey
@@ -198,9 +202,9 @@ func (sdk *SDK) GetCurrentFee(
 	token types.Token,
 	sender common.Address,
 	transferId common.Address,
-	expiration *big.Int,
+	expiration int64,
 	amount *big.Int,
-) (fee *types.CLFee, totalAmount *big.Int, err error) {
+) (fee *types.ClaimLinkFee, totalAmount *big.Int, err error) {
 	feeB, err := sdk.Client.GetFee(
 		token,
 		sender,
@@ -234,7 +238,7 @@ func (sdk *SDK) GetCurrentFee(
 	if getFeeResp.FeeToken == types.ZeroAddress {
 		tokenType = types.TokenTypeNative
 	}
-	return &types.CLFee{
+	return &types.ClaimLinkFee{
 		Token: types.Token{
 			Type:    tokenType,
 			ChainId: token.ChainId,
@@ -314,7 +318,7 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 		},
 		Amount:      amount,
 		TotalAmount: totalAmount,
-		Fee: &types.CLFee{
+		Fee: &types.ClaimLinkFee{
 			Token: types.Token{
 				Type:    feeTokenType,
 				ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
@@ -329,7 +333,7 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 		LinkKey:       decodedLink.LinkKey,
 		ClaimUrl:      &claimUrl,
 		ForRecipient:  false,
-		Status:        types.ClItemStatusFromString(cl["status"].(string)),
+		Status:        cl["status"].(types.ClaimLinkStatus),
 		Source:        types.CLSource(cl["escrow"].(string)),
 	}
 	err = claimLink.Validate()

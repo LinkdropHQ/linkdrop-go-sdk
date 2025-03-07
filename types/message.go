@@ -1,7 +1,7 @@
 package types
 
 type EncryptedMessage struct {
-	Message                []byte
-	EncryptionKey          [32]byte
-	EncryptionKeyLinkParam [32]byte
+	Data          []byte
+	EncryptionKey [32]byte
+	InitialKey    [32]byte
 }

@@ -2,7 +2,7 @@ package helpers
 
 import (
 	"fmt"
-	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/constants"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/constants"
 	"github.com/ethereum/go-ethereum/common"
 )
 

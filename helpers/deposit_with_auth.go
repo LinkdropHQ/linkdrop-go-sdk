@@ -3,7 +3,7 @@ package helpers
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/constants"
+	constants2 "github.com/LinkdropHQ/linkdrop-go-sdk/constants"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,7 +26,7 @@ func GetDepositAuthorization(
 	domain apitypes.TypedDataDomain,
 	token types.Token,
 	feeAmount *big.Int,
-	authSelector constants.Selector,
+	authSelector constants2.Selector,
 	authorizationMethod *types.AuthorizationMethod,
 ) ([]byte, error) {
 
@@ -63,7 +63,7 @@ func GetDepositAuthorization(
 
 	// Default behavior for Polygon chain
 	if token.ChainId == types.ChainIdPolygon {
-		if token.Address == constants.TAUsdcBridgedPolygon {
+		if token.Address == constants2.TAUsdcBridgedPolygon {
 			return getDepositAuthorizationApprove(
 				sender,
 				to,
@@ -181,7 +181,7 @@ func getDepositAuthorizationReceive(
 	expiration *big.Int,
 	feeAmount *big.Int,
 	domain apitypes.TypedDataDomain,
-	authSelector constants.Selector,
+	authSelector constants2.Selector,
 	signTypedData types.SignTypedDataCallback,
 ) ([]byte, error) {
 
@@ -233,7 +233,7 @@ func getDepositAuthorizationReceive(
 	log.Println(ToHex(nonce[:]))
 
 	// Handling legacy receiveWithAuthorization - the signature should be provided as v, r, s
-	if authSelector == constants.SelectorReceiveWithAuthorizationEOA {
+	if authSelector == constants2.SelectorReceiveWithAuthorizationEOA {
 		// Legacy format: split signature
 		if len(signature) != 65 {
 			return []byte{}, fmt.Errorf("invalid signature length: %d", len(signature))
