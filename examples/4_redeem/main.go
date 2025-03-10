@@ -1,36 +1,23 @@
 package main
 
 import (
-	"crypto/rand"
 	"github.com/LinkdropHQ/linkdrop-go-sdk"
-	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"log"
 	"os"
 )
 
-func getRandomBytes(length int64) []byte {
-	b := make([]byte, length)
-	_, err := rand.Read(b)
-	if err != nil {
-		log.Fatalf("Failed to generate random bytes: %v", err)
-	}
-	return b
-}
-
 func main() {
 	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
-		types.DeploymentCBW,
-		getRandomBytes,
-		linkdrop.WithApiKey(os.Getenv("LINKDROP_API_KEY")),
+		os.Getenv("LINKDROP_API_KEY"),
+		linkdrop.WithCoinbaseWalletProductionDefaults(),
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	link, err := sdk.GetClaimLink(
-		os.Getenv("LINKDROP_LINK"),
-	)
+
+	link, err := sdk.GetClaimLink(os.Getenv("LINKDROP_LINK"))
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -36,14 +36,15 @@ func Init(baseUrl string, apiKey string, opts ...Option) (*SDK, error) {
 		return nil, err
 	}
 
-	sdkConfig := new(SDKConfig)
+	var sdkConfig SDKConfig
 	sdkConfig.applyDefaults()
 	for _, opt := range opts {
-		opt(sdkConfig)
+		opt(&sdkConfig)
 	}
 	sdkConfig.baseURL = baseUrl
 
 	return &SDK{
+		config: sdkConfig,
 		Client: &Client{
 			config: &ClientConfig{
 				apiKey: apiKey,
@@ -67,7 +68,7 @@ func (sdk *SDK) GetVersionFromEscrowContract(escrowAddress common.Address) (stri
 
 // ClaimLink creates a new ClaimLink generating linkKey using randomBytesCallback
 func (sdk *SDK) ClaimLink(
-	params *ClaimLinkCreationParams,
+	params ClaimLinkCreationParams,
 	randomBytesCallback types.RandomBytesCallback,
 ) (claimLink *ClaimLink, err error) {
 	linkKey, err := helpers.PrivateKey(randomBytesCallback)
@@ -81,17 +82,17 @@ func (sdk *SDK) ClaimLink(
 // ClaimLinkWithTransferId creates a new ClaimLink setting with provided transferId
 // NOTE: the generated link will be created without linkKey and will lack some functionality
 func (sdk *SDK) ClaimLinkWithTransferId(
-	params *ClaimLinkCreationParams,
+	params ClaimLinkCreationParams,
 	transferId common.Address,
 ) (claimLink *ClaimLink, err error) {
 	claimLink = new(ClaimLink)
-	err = claimLink.new(sdk, params, nil, transferId)
+	err = claimLink.new(sdk, &params, nil, transferId)
 	return
 }
 
 // ClaimLinkWithLinkKey creates a new ClaimLink with pre-generated linkKey
 func (sdk *SDK) ClaimLinkWithLinkKey(
-	params *ClaimLinkCreationParams,
+	params ClaimLinkCreationParams,
 	linkKey ecdsa.PrivateKey,
 ) (claimLink *ClaimLink, err error) {
 	transferId, err := helpers.AddressFromPrivateKey(&linkKey)
@@ -99,7 +100,7 @@ func (sdk *SDK) ClaimLinkWithLinkKey(
 		return
 	}
 	claimLink = new(ClaimLink)
-	err = claimLink.new(sdk, params, &linkKey, transferId)
+	err = claimLink.new(sdk, &params, &linkKey, transferId)
 	return
 }
 
@@ -291,12 +292,11 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 			},
 			Amount: feeAmount,
 		},
-		Expiration:    cl["expiration"].(int64),
+		Expiration:    int64(cl["expiration"].(float64)),
 		TransferId:    common.HexToAddress(cl["transfer_id"].(string)),
 		EscrowAddress: common.HexToAddress(cl["escrow"].(string)),
-		Operations:    nil,
 		LinkKey:       &decodedLink.LinkKey,
-		Status:        cl["status"].(types.ClaimLinkStatus),
+		Status:        types.ClaimLinkStatusFromString(cl["status"].(string)),
 	}
 	return
 }

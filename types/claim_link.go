@@ -69,6 +69,32 @@ func (clis ClaimLinkStatus) String() string {
 	return ""
 }
 
+func ClaimLinkStatusFromString(value string) ClaimLinkStatus {
+	switch value {
+	case "":
+		return ClaimLinkStatusUndefined
+	case "created":
+		return ClaimLinkStatusCreated
+	case "depositing":
+		return ClaimLinkStatusDepositing
+	case "deposited":
+		return ClaimLinkStatusDeposited
+	case "redeeming":
+		return ClaimLinkStatusRedeeming
+	case "redeemed":
+		return ClaimLinkStatusRedeemed
+	case "refunding":
+		return ClaimLinkStatusRefunding
+	case "refunded":
+		return ClaimLinkStatusRefunded
+	case "cancelled":
+		return ClaimLinkStatusCancelled
+	case "error":
+		return ClaimLinkStatusError
+	}
+	return ClaimLinkStatusUndefined
+}
+
 type ClaimLinkOperationStatus string
 
 const (

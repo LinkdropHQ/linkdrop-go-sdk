@@ -83,19 +83,19 @@ func DecodeLink(link string) (*types.Link, error) {
 
 	// Decode transferId or generate from linkKey
 	var transferId common.Address
-	if params["transferId"] != "" {
-		transferIdBytes, err := base58.Decode(params["transferId"])
-		if err != nil {
-			return nil, err
-		}
-		transferId = common.BytesToAddress(transferIdBytes)
-	} else {
+	if params["transferId"] == "" {
 		// Derive wallet address from linkKey
 		privateKey, err := crypto.ToECDSA(linkKeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive private key from linkKey: %w", err)
 		}
 		transferId = crypto.PubkeyToAddress(privateKey.PublicKey)
+	} else {
+		transferIdBytes, err := base58.Decode(params["transferId"])
+		if err != nil {
+			return nil, err
+		}
+		transferId = common.BytesToAddress(transferIdBytes)
 	}
 
 	// Parse chainId
@@ -105,11 +105,11 @@ func DecodeLink(link string) (*types.Link, error) {
 	}
 
 	l := &types.Link{
-		SenderSig:  senderSig,
-		LinkKey:    linkKey,
-		TransferId: transferId,
-		ChainId:    types.ChainId(chainId),
-		Version:    params["version"],
+		SenderSignature: senderSig,
+		LinkKey:         *linkKey,
+		TransferId:      transferId,
+		ChainId:         types.ChainId(chainId),
+		Version:         params["version"],
 	}
 
 	// Handle optional encryptionKey
@@ -120,7 +120,11 @@ func DecodeLink(link string) (*types.Link, error) {
 			return nil, errors.New("invalid encryptionKey value")
 		}
 		copy(ek[:], ekDecoded)
-		l.EncryptionKeyLinkParam = &ek
+		l.Message = &types.EncryptedMessage{
+			Data:          nil,
+			EncryptionKey: [32]byte{},
+			InitialKey:    ek,
+		}
 	}
 
 	return l, nil

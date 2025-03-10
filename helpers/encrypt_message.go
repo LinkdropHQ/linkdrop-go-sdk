@@ -53,6 +53,7 @@ func EncryptMessage(
 	// Build the result
 	result := &types.EncryptedMessage{
 		Data:          append(encryptionKeyLengthB[:], encryptedSenderMessage...),
+		InitialKey:    initialKey,
 		EncryptionKey: encryptionKey,
 	}
 	return result, nil

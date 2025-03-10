@@ -34,29 +34,30 @@ func getRandomBytes(length int64) []byte {
 func main() {
 	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
-		types.DeploymentCBW,
-		getRandomBytes,
-		linkdrop.WithApiKey(os.Getenv("LINKDROP_API_KEY")),
+		os.Getenv("LINKDROP_API_KEY"),
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	// ERC20
-	clERC20, err := sdk.CreateClaimLink(
-		types.Token{
-			Type:    types.TokenTypeERC20,
-			ChainId: types.ChainIdBase,
-			Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+	clERC20, err := sdk.ClaimLink(
+		linkdrop.ClaimLinkCreationParams{
+			Token: types.Token{
+				Type:    types.TokenTypeERC20,
+				ChainId: types.ChainIdBase,
+				Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+			},
+			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
+			Amount:     big.NewInt(100000),
+			Expiration: 1773159165,
 		},
-		big.NewInt(100000),
-		common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-		big.NewInt(1695985897077),
+		getRandomBytes,
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	url, _, err := clERC20.GenerateClaimUrl(signTypedData)
+	url, err := clERC20.GenerateClaimUrl(nil) // Sender signature is nil since we're generating a non-recovered link here
 	if err != nil {
 		log.Fatalln(err)
 	}

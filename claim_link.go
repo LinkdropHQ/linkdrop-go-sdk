@@ -38,11 +38,10 @@ type ClaimLink struct {
 }
 
 type ClaimLinkCreationParams struct {
-	Token         types.Token
-	Sender        common.Address
-	Amount        *big.Int
-	EscrowAddress common.Address
-	Expiration    int64
+	Token      types.Token
+	Sender     common.Address
+	Amount     *big.Int
+	Expiration int64
 }
 
 func (cl *ClaimLink) newWithLinkKey(
@@ -102,7 +101,7 @@ func (cl *ClaimLink) new(
 		Fee:         *fee,
 		TotalAmount: totalAmount,
 
-		EscrowAddress: params.EscrowAddress,
+		EscrowAddress: sdk.config.escrowContractAddress,
 		Expiration:    params.Expiration,
 		Status:        types.ClaimLinkStatusCreated,
 	}
@@ -131,7 +130,6 @@ func (cl *ClaimLink) AddMessage(
 	if int64(len(message)) > cl.SDK.config.messageConfig.MaxTextLength {
 		return errors.New("message text length is too long")
 	}
-	// TODO move config to SDK?
 	if encryptionKeyLength > cl.SDK.config.messageConfig.MaxEncryptionKeyLength ||
 		encryptionKeyLength < cl.SDK.config.messageConfig.MinEncryptionKeyLength {
 		return errors.New("message text length is too long")
@@ -171,6 +169,9 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 		cl.EscrowAddress,
 		receiverSig,
 	)
+	if err != nil {
+		return
+	}
 	ApiRespModel := struct {
 		Success bool   `json:"success"`
 		TxHash  string `json:"tx_hash"`

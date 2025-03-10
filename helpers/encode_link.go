@@ -8,24 +8,21 @@ import (
 )
 
 func EncodeLink(claimHost string, link types.Link) string {
-	if link.LinkKey == nil {
-		return ""
-	}
 	// Encode LinkKey and TransferId to Base58
 	linkKey := base58.Encode(link.LinkKey.D.Bytes())
 	transferId := base58.Encode(link.TransferId.Bytes())
 
 	// Handle optional encryption key
 	var encryptionKey string
-	if link.EncryptionKeyLinkParam != nil && *link.EncryptionKeyLinkParam != [32]byte{} {
-		encryptionKey = fmt.Sprintf("&m=0x%x", *link.EncryptionKeyLinkParam)
+	if link.Message != nil && link.Message.InitialKey != [32]byte{} {
+		encryptionKey = fmt.Sprintf("&m=0x%x", link.Message.InitialKey)
 	}
 	chainId := strconv.Itoa(int(link.ChainId))
 
 	// Handle optional SenderSig
-	if link.SenderSig != nil {
-		sigLength := (len(link.SenderSig) - 2) / 2
-		sig := base58.Encode(link.SenderSig)
+	if link.SenderSignature != nil {
+		sigLength := len(link.SenderSignature) - 1 // 1st byte is sig length
+		sig := base58.Encode(link.SenderSignature)
 		return fmt.Sprintf("%s/#/code?k=%s&sg=%s&i=%s&c=%s&v=3&sgl=%d&src=p2p%s",
 			claimHost, linkKey, sig, transferId, chainId, sigLength, encryptionKey)
 	}

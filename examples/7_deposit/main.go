@@ -47,9 +47,7 @@ func sendTransaction(chainId *big.Int, to common.Address, value *big.Int, data [
 func main() {
 	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
-		types.DeploymentCBW,
-		getRandomBytes,
-		linkdrop.WithApiKey(os.Getenv("LINKDROP_API_KEY")),
+		os.Getenv("LINKDROP_API_KEY"),
 		linkdrop.WithCoinbaseWalletProductionDefaults(),
 	)
 	if err != nil {
@@ -57,29 +55,32 @@ func main() {
 	}
 
 	// ERC20
-	clERC20, err := sdk.CreateClaimLink(
-		types.Token{
-			Type:    types.TokenTypeERC20,
-			ChainId: types.ChainIdBase,
-			Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+	clERC20, err := sdk.ClaimLink(
+		linkdrop.ClaimLinkCreationParams{
+			Token: types.Token{
+				Type:    types.TokenTypeERC20,
+				ChainId: types.ChainIdBase,
+				Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+			},
+			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
+			Amount:     big.NewInt(100000),
+			Expiration: 1695985897,
 		},
-		big.NewInt(100000),
-		common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-		big.NewInt(1695985897077),
+		getRandomBytes,
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	url, _, err := clERC20.GenerateClaimUrl(signTypedData)
+	url, err := clERC20.GenerateClaimUrl(nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	log.Println(url) // The link is valid, but can't be claimed since assets are were deposited
 
-	txHash, transferId, err := clERC20.Deposit(sendTransaction)
+	txHash, err := clERC20.Deposit(sendTransaction)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println("TX Hash: ", txHash, "\n Transfer ID: ", transferId)
+	log.Println("TX Hash: ", txHash)
 }
