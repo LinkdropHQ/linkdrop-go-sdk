@@ -3,91 +3,54 @@ package linkdrop
 import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/constants"
 	"github.com/ethereum/go-ethereum/common"
-	"time"
 )
 
-type Option func(*Config)
-
-func WithApiKey(key string) Option {
-	return func(c *Config) {
-		c.apiKey = key
-	}
-}
-
-func WithApiURL(url string) Option {
-	return func(c *Config) {
-		c.apiURL = url
-	}
-}
-
-func WithDashboardURL(url string) Option {
-	return func(c *Config) {
-		c.dashboardURL = url
-	}
-}
-
-func WithTimeout(timeout time.Duration) Option {
-	return func(c *Config) {
-		c.timeout = timeout
-	}
-}
-
-func WithRetryCount(retryCount int64) Option {
-	return func(c *Config) {
-		c.retryCount = retryCount
-	}
-}
-
-func WithNativeTokenAddress(tokenAddress common.Address) Option {
-	return func(c *Config) {
-		c.nativeTokenAddress = tokenAddress
-	}
-}
+type Option func(*SDKConfig)
 
 func WithEscrowContractAddress(escrowContractAddress common.Address) Option {
-	return func(c *Config) {
-		c.escrowContractAddress = escrowContractAddress
+	return func(sdkc *SDKConfig) {
+		sdkc.escrowContractAddress = escrowContractAddress
 	}
 }
 
 func WithEscrowNFTContractAddress(escrowNFTContractAddress common.Address) Option {
-	return func(c *Config) {
-		c.escrowNFTContractAddress = escrowNFTContractAddress
+	return func(sdkc *SDKConfig) {
+		sdkc.escrowNFTContractAddress = escrowNFTContractAddress
 	}
 }
 
 func WithEnvironmentTag(tag string) Option {
-	return func(c *Config) {
-		c.environment = tag
+	return func(sdkc *SDKConfig) {
+		sdkc.environment = tag
 	}
 }
 
 func WithMessageConfig(messageConfig MessageConfig) Option {
-	return func(c *Config) {
-		c.messageConfig = messageConfig
+	return func(sdkc *SDKConfig) {
+		sdkc.messageConfig = messageConfig
 	}
 }
 
 // Presets
 
 func WithDefaultMessageConfig() Option {
-	return func(c *Config) {
-		c.applyDefaultMessageConfig()
+	return func(sdkc *SDKConfig) {
+		sdkc.applyDefaultMessageConfig()
 	}
 }
 
 func WithProductionDefaults() Option {
-	return func(c *Config) {
-		c.applyProductionDefaults()
-		c.environment = "production"
+	return func(sdkc *SDKConfig) {
+		sdkc.applyProductionDefaults()
+		sdkc.environment = "production"
 	}
 }
 
 func WithCoinbaseWalletProductionDefaults() Option {
-	return func(c *Config) {
-		c.applyProductionDefaults()
-		c.escrowContractAddress = constants.CbwEscrowContractAddress
-		c.escrowNFTContractAddress = constants.CbwEscrowNFTContractAddress
-		c.environment = "production-coinbase-wallet"
+	return func(sdkc *SDKConfig) {
+		sdkc.applyProductionDefaults()
+		sdkc.escrowContractAddress = constants.CbwEscrowContractAddress
+		sdkc.escrowNFTContractAddress = constants.CbwEscrowNFTContractAddress
+		sdkc.environment = "production-coinbase-wallet"
 	}
 }

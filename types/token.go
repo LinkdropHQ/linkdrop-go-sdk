@@ -11,12 +11,19 @@ var ZeroAddress = common.Address{}
 type TokenType string
 
 const (
-	TokenTypeUndefined TokenType = ""
-	TokenTypeNative    TokenType = "NATIVE"
-	TokenTypeERC20     TokenType = "ERC20"
-	TokenTypeERC721    TokenType = "ERC721"
-	TokenTypeERC1155   TokenType = "ERC1155"
+	TokenTypeNative  TokenType = "NATIVE"
+	TokenTypeERC20   TokenType = "ERC20"
+	TokenTypeERC721  TokenType = "ERC721"
+	TokenTypeERC1155 TokenType = "ERC1155"
 )
+
+func (tt TokenType) isSupported() bool {
+	switch tt {
+	case TokenTypeNative, TokenTypeERC20, TokenTypeERC721, TokenTypeERC1155:
+		return true
+	}
+	return false
+}
 
 type Token struct {
 	Type    TokenType      `json:"type"`
@@ -28,6 +35,9 @@ type Token struct {
 func (t *Token) Validate() error {
 	if !t.ChainId.IsSupported() {
 		return errors.New("token chainId is not supported")
+	}
+	if !t.Type.isSupported() {
+		return errors.New("token type is not supported")
 	}
 	if t.Type == TokenTypeNative {
 		if t.Address != ZeroAddress {

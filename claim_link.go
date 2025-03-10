@@ -19,7 +19,8 @@ import (
 type ClaimLink struct {
 	SDK *SDK
 
-	LinkKey ecdsa.PrivateKey
+	LinkKey    *ecdsa.PrivateKey
+	TransferId common.Address
 
 	Token  types.Token
 	Amount *big.Int
@@ -36,8 +37,7 @@ type ClaimLink struct {
 	Status        types.ClaimLinkStatus
 }
 
-type ClaimLinkParams struct {
-	SDK           *SDK
+type ClaimLinkCreationParams struct {
 	Token         types.Token
 	Sender        common.Address
 	Amount        *big.Int
@@ -45,38 +45,40 @@ type ClaimLinkParams struct {
 	Expiration    int64
 }
 
-func NewClaimLink(
-	params *ClaimLinkParams,
-	randomBytesCallback types.RandomBytesCallback,
-) (claimLink *ClaimLink, err error) {
-	linkKey, err := helpers.PrivateKey(randomBytesCallback)
+func (cl *ClaimLink) newWithLinkKey(
+	sdk *SDK,
+	params *ClaimLinkCreationParams,
+	linkKey ecdsa.PrivateKey,
+) (err error) {
+	// Transfer Id
+	transferId, err := helpers.AddressFromPrivateKey(&linkKey)
 	if err != nil {
 		return
 	}
-	return NewClaimLinkWithLinkKey(params, *linkKey)
+	return cl.new(sdk, params, &linkKey, transferId)
 }
 
-func NewClaimLinkWithLinkKey(
-	params *ClaimLinkParams,
-	linkKey ecdsa.PrivateKey,
-) (claimLink *ClaimLink, err error) {
+func (cl *ClaimLink) new(
+	sdk *SDK,
+	params *ClaimLinkCreationParams,
+	linkKey *ecdsa.PrivateKey,
+	transferId common.Address,
+) (err error) {
 	// Validating params
+	if params == nil {
+		return errors.New("params is required")
+	}
 	// SDK should be passed to access LinkDrop API via Client
-	if params.SDK == nil {
-		return nil, errors.New("params.SDK is required")
+	if sdk == nil {
+		return errors.New("params.SDK is required")
 	}
 	// Token
 	err = params.Token.Validate()
 	if err != nil {
 		return
 	}
-	// Transfer Id
-	transferId, err := helpers.AddressFromPrivateKey(&linkKey)
-	if err != nil {
-		return
-	}
 	// Fee
-	fee, totalAmount, err := params.SDK.GetCurrentFee(
+	fee, totalAmount, err := sdk.GetCurrentFee(
 		params.Token,
 		params.Sender,
 		transferId,
@@ -84,13 +86,14 @@ func NewClaimLinkWithLinkKey(
 		params.Amount,
 	)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	claimLink = &ClaimLink{
-		SDK: params.SDK,
+	*cl = ClaimLink{
+		SDK: sdk,
 
-		LinkKey: linkKey,
+		LinkKey:    linkKey,
+		TransferId: transferId,
 
 		Token:  params.Token,
 		Amount: params.Amount,
@@ -111,6 +114,7 @@ func (cl *ClaimLink) AddMessage(
 	message string,
 	encryptionKeyLength int64,
 	signTypedData types.SignTypedDataCallback,
+	getRandomBytes types.RandomBytesCallback,
 ) (err error) {
 	if encryptionKeyLength == 0 {
 		encryptionKeyLength = 12
@@ -124,25 +128,21 @@ func (cl *ClaimLink) AddMessage(
 	if signTypedData == nil {
 		return errors.New("signTypedData callback is required")
 	}
-	if int64(len(message)) > cl.SDK.Client.config.messageConfig.MaxTextLength {
+	if int64(len(message)) > cl.SDK.config.messageConfig.MaxTextLength {
 		return errors.New("message text length is too long")
 	}
 	// TODO move config to SDK?
-	if encryptionKeyLength > cl.SDK.Client.config.messageConfig.MaxEncryptionKeyLength ||
-		encryptionKeyLength < cl.SDK.Client.config.messageConfig.MinEncryptionKeyLength {
+	if encryptionKeyLength > cl.SDK.config.messageConfig.MaxEncryptionKeyLength ||
+		encryptionKeyLength < cl.SDK.config.messageConfig.MinEncryptionKeyLength {
 		return errors.New("message text length is too long")
 	}
 
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
 	cl.Message, err = helpers.EncryptMessage(
 		message,
-		transferId,
+		cl.TransferId,
 		cl.Token.ChainId,
 		encryptionKeyLength,
-		cl.SDK.GetRandomBytes,
+		getRandomBytes,
 		signTypedData,
 	)
 	return
@@ -150,20 +150,21 @@ func (cl *ClaimLink) AddMessage(
 
 func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err error) {
 	if receiver == types.ZeroAddress {
-		return txHash, errors.New("redeem: receiver is not valid")
+		err = errors.New("redeem: receiver is not valid")
+		return
+	}
+	if cl.LinkKey == nil {
+		err = errors.New("redeem: can't redeem without linkKey")
+		return
 	}
 
-	receiverSig, err := helpers.GenerateReceiverSig(&cl.LinkKey, receiver)
+	receiverSig, err := helpers.GenerateReceiverSig(cl.LinkKey, receiver)
 	if err != nil {
 		return
 	}
 
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
 	bApiResp, err := cl.SDK.Client.RedeemLink(
-		transferId,
+		cl.TransferId,
 		cl.Token,
 		cl.Sender,
 		receiver,
@@ -187,11 +188,7 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 }
 
 func (cl *ClaimLink) GetStatus() (status types.ClaimLinkStatus, operations []types.ClaimLinkOperation, err error) {
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
-	linkB, err := cl.SDK.Client.GetTransferStatus(cl.Token.ChainId, transferId)
+	linkB, err := cl.SDK.Client.GetTransferStatus(cl.Token.ChainId, cl.TransferId)
 	claimLink := struct {
 		Status     types.ClaimLinkStatus      `json:"status"`
 		Operations []types.ClaimLinkOperation `json:"operations"`
@@ -214,13 +211,9 @@ func (cl *ClaimLink) DecryptSenderMessage(
 	if cl.Message == nil {
 		return "", nil
 	}
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
 	if cl.Message.EncryptionKey == [crypto.KeyLength]byte{} {
 		messageInitialKey, err := helpers.MessageInitialKeyCreate(
-			transferId,
+			cl.TransferId,
 			cl.Token.ChainId,
 			signTypedData,
 		)
@@ -237,11 +230,6 @@ func (cl *ClaimLink) DecryptSenderMessage(
 }
 
 func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, err error) {
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
-
 	var messageData []byte
 	if cl.Message != nil {
 		messageData = cl.Message.Data
@@ -252,7 +240,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, e
 	case types.TokenTypeNative:
 		data, err = constants.EscrowTokenAbi.Pack(
 			"depositETH",
-			transferId,
+			cl.TransferId,
 			cl.TotalAmount.String(),
 			strconv.Itoa(int(cl.Expiration)),
 			cl.Fee.Amount.String(),
@@ -263,7 +251,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, e
 		data, err = constants.EscrowTokenAbi.Pack(
 			"deposit",
 			cl.Token.Address,
-			transferId,
+			cl.TransferId,
 			cl.TotalAmount,
 			cl.Expiration,
 			cl.Fee.Token.Address,
@@ -305,15 +293,11 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 }
 
 func (cl *ClaimLink) DepositRegister(transaction types.Transaction) (err error) {
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
 	_, err = cl.SDK.Client.Deposit(
 		cl.Token,
 		cl.Sender,
 		cl.EscrowAddress,
-		transferId,
+		cl.TransferId,
 		cl.Expiration,
 		transaction,
 		cl.Fee,
@@ -362,10 +346,6 @@ func (cl *ClaimLink) GenerateRecoveredClaimUrl(
 	getRandomBytes types.RandomBytesCallback,
 	signTypedData types.SignTypedDataCallback,
 ) (link string, err error) {
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
 	newLinkKey, err := helpers.PrivateKey(getRandomBytes)
 	if err != nil {
 		return
@@ -384,7 +364,7 @@ func (cl *ClaimLink) GenerateRecoveredClaimUrl(
 		ChainId:           math.NewHexOrDecimal256(int64(cl.Token.ChainId)),
 		VerifyingContract: cl.EscrowAddress.Hex(),
 	}
-	senderSignature, err := signTypedData(helpers.LinkSignatureTypedData(linkKeyId, transferId, *escrowPaymentDomain))
+	senderSignature, err := signTypedData(helpers.LinkSignatureTypedData(linkKeyId, cl.TransferId, *escrowPaymentDomain))
 	if err != nil {
 		return
 	}
@@ -397,34 +377,29 @@ func (cl *ClaimLink) GenerateRecoveredClaimUrl(
 func (cl *ClaimLink) GenerateClaimUrl(
 	senderSignature []byte,
 ) (link string, err error) {
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
+	if cl.LinkKey == nil {
+		return "", errors.New("can't generate claim url without linkKey")
 	}
 	linkParams := types.Link{
-		LinkKey:         cl.LinkKey,
-		TransferId:      transferId,
+		LinkKey:         *cl.LinkKey,
+		TransferId:      cl.TransferId,
 		ChainId:         cl.Token.ChainId,
 		SenderSignature: senderSignature,
 		Sender:          &cl.Sender,
 		Message:         cl.Message,
 	}
 	link = helpers.EncodeLink(
-		cl.SDK.Client.config.baseURL,
+		cl.SDK.config.baseURL,
 		linkParams,
 	)
 	return
 }
 
 func (cl *ClaimLink) getFee(amount *big.Int) (fee *types.ClaimLinkFeeData, err error) {
-	transferId, err := helpers.AddressFromPrivateKey(&cl.LinkKey)
-	if err != nil {
-		return
-	}
 	feeB, err := cl.SDK.Client.GetFee(
 		cl.Token,
 		cl.Sender,
-		transferId,
+		cl.TransferId,
 		cl.Expiration,
 		amount,
 	)

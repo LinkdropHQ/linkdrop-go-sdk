@@ -13,7 +13,7 @@ import (
 )
 
 type Client struct {
-	config *Config
+	config *ClientConfig // Client scoped configuration - endpoints
 }
 
 // RedeemRecoveredLink allows a receiver to redeem a link that has been recovered.
@@ -206,7 +206,12 @@ func (c *Client) GetFee(
 //
 // Notes:
 // - The function dynamically determines the API host based on the token's chain ID.
-func (c *Client) GetHistory(token types.Token, sender common.Address, onlyActive bool, offset, limit int64) ([]byte, error) {
+func (c *Client) GetHistory(
+	token types.Token,
+	sender common.Address,
+	onlyActive bool,
+	offset, limit int64,
+) ([]byte, error) {
 	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
 	if err != nil {
 		return nil, err

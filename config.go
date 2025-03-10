@@ -3,7 +3,6 @@ package linkdrop
 import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/constants"
 	"github.com/ethereum/go-ethereum/common"
-	"time"
 )
 
 type MessageConfig struct {
@@ -12,51 +11,37 @@ type MessageConfig struct {
 	MaxTextLength          int64
 }
 
-type Config struct {
-	apiKey                   string
+// ClientConfig is a configuration of the API Client
+type ClientConfig struct {
+	apiKey string
+	apiURL string
+}
+
+type SDKConfig struct {
 	baseURL                  string
-	apiURL                   string
-	dashboardURL             string
-	timeout                  time.Duration
-	retryCount               int64
-	nativeTokenAddress       common.Address
 	escrowContractAddress    common.Address
 	escrowNFTContractAddress common.Address
 	messageConfig            MessageConfig
 	environment              string
 }
 
-func (c *Config) Environment() string {
-	return c.environment
+func (sdkc *SDKConfig) applyDefaults() {
+	sdkc.escrowContractAddress = constants.EscrowContractAddress
+	sdkc.escrowNFTContractAddress = constants.EscrowNFTContractAddress
+	sdkc.environment = "development"
+	sdkc.applyDefaultMessageConfig()
 }
 
-func (c *Config) applyDefaultMessageConfig() {
-	c.messageConfig = MessageConfig{
+func (sdkc *SDKConfig) applyProductionDefaults() {
+	sdkc.escrowContractAddress = constants.EscrowContractAddress
+	sdkc.escrowNFTContractAddress = constants.EscrowNFTContractAddress
+	sdkc.applyDefaultMessageConfig()
+}
+
+func (sdkc *SDKConfig) applyDefaultMessageConfig() {
+	sdkc.messageConfig = MessageConfig{
 		MinEncryptionKeyLength: 6,
 		MaxEncryptionKeyLength: 43,
 		MaxTextLength:          140,
 	}
-}
-
-func (c *Config) applyDefaults() {
-	c.apiURL = constants.ApiURL
-	c.dashboardURL = constants.DevDashboardApiUrl
-	c.timeout = 60 * time.Second
-	c.retryCount = 5
-	c.nativeTokenAddress = constants.NativeTokenAddress
-	c.escrowContractAddress = constants.EscrowContractAddress
-	c.escrowNFTContractAddress = constants.EscrowNFTContractAddress
-	c.environment = "development"
-	c.applyDefaultMessageConfig()
-}
-
-func (c *Config) applyProductionDefaults() {
-	c.apiURL = constants.ApiURL
-	c.dashboardURL = constants.DashboardApiUrl
-	c.timeout = 10 * time.Second
-	c.retryCount = 3
-	c.nativeTokenAddress = constants.NativeTokenAddress
-	c.escrowContractAddress = constants.EscrowContractAddress
-	c.escrowNFTContractAddress = constants.EscrowNFTContractAddress
-	c.applyDefaultMessageConfig()
 }
