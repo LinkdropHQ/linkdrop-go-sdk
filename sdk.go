@@ -4,7 +4,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/helpers"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/constants"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
@@ -12,25 +13,22 @@ import (
 )
 
 type SenderHistory struct {
-	ClaimLinks []ClaimLink     `json:"claimLinks"`
-	ResultSet  types.ResultSet `json:"resultSet"`
+	ClaimLinks []ClaimLink `json:"claimLinks"`
+	ResultSet  struct {
+		Total  int64 `json:"total"`
+		Limit  int64 `json:"limit"`
+		Offset int64 `json:"offset"`
+	} `json:"resultSet"`
 }
 
 type SDK struct {
-	Client         *Client
-	Deployment     types.Deployment
-	GetRandomBytes types.RandomBytesCallback
+	config SDKConfig
+	Client *Client
 }
 
-func Init(baseUrl string, deployment types.Deployment, getRandomBytes types.RandomBytesCallback, opts ...Option) (*SDK, error) {
+func Init(baseUrl string, apiKey string, opts ...Option) (*SDK, error) {
 	if baseUrl == "" {
 		return nil, errors.New("baseUrl is required")
-	}
-	if deployment != types.DeploymentLD && deployment != types.DeploymentCBW {
-		return nil, errors.New("deployment is invalid, should be one of: LD, CBW")
-	}
-	if getRandomBytes == nil {
-		return nil, errors.New("getRandomBytes is required")
 	}
 
 	err := helpers.LoadABI()
@@ -38,18 +36,26 @@ func Init(baseUrl string, deployment types.Deployment, getRandomBytes types.Rand
 		return nil, err
 	}
 
-	cfg := new(Config)
-	cfg.applyDefaults()
+	var sdkConfig SDKConfig
+	sdkConfig.applyDefaults()
 	for _, opt := range opts {
-		opt(cfg)
+		opt(&sdkConfig)
 	}
-	cfg.baseURL = baseUrl
+	sdkConfig.baseURL = baseUrl
 
 	return &SDK{
-		Client:         &Client{config: cfg},
-		Deployment:     deployment,
-		GetRandomBytes: getRandomBytes,
+		config: sdkConfig,
+		Client: &Client{
+			config: &ClientConfig{
+				apiKey: apiKey,
+				apiURL: constants.ApiURL,
+			},
+		},
 	}, nil
+}
+
+func (sdk *SDK) Environment() string {
+	return sdk.config.environment
 }
 
 func (sdk *SDK) GetVersionFromClaimUrl(claimUrl string) (string, error) {
@@ -60,33 +66,42 @@ func (sdk *SDK) GetVersionFromEscrowContract(escrowAddress common.Address) (stri
 	return helpers.DefineEscrowVersion(escrowAddress)
 }
 
-func (sdk *SDK) GetLinkSourceFromClaimUrl(claimUrl string) (types.CLSource, error) {
-	return helpers.LinkSourceFromClaimUrl(claimUrl)
-}
-
-func (sdk *SDK) CreateClaimLink(
-	token types.Token,
-	amount *big.Int,
-	sender common.Address,
-	expiration *big.Int,
+// ClaimLink creates a new ClaimLink generating linkKey using randomBytesCallback
+func (sdk *SDK) ClaimLink(
+	params ClaimLinkCreationParams,
+	randomBytesCallback types.RandomBytesCallback,
 ) (claimLink *ClaimLink, err error) {
-	err = token.Validate()
+	linkKey, err := helpers.PrivateKey(randomBytesCallback)
 	if err != nil {
 		return
 	}
+	claimLink = new(ClaimLink)
+	return sdk.ClaimLinkWithLinkKey(params, *linkKey)
+}
 
-	if amount.Cmp(big.NewInt(0)) == 0 {
-		return nil, errors.New("claim link requires amount")
+// ClaimLinkWithTransferId creates a new ClaimLink setting with provided transferId
+// NOTE: the generated link will be created without linkKey and will lack some functionality
+func (sdk *SDK) ClaimLinkWithTransferId(
+	params ClaimLinkCreationParams,
+	transferId common.Address,
+) (claimLink *ClaimLink, err error) {
+	claimLink = new(ClaimLink)
+	err = claimLink.new(sdk, &params, nil, transferId)
+	return
+}
+
+// ClaimLinkWithLinkKey creates a new ClaimLink with pre-generated linkKey
+func (sdk *SDK) ClaimLinkWithLinkKey(
+	params ClaimLinkCreationParams,
+	linkKey ecdsa.PrivateKey,
+) (claimLink *ClaimLink, err error) {
+	transferId, err := helpers.AddressFromPrivateKey(&linkKey)
+	if err != nil {
+		return
 	}
-
-	return sdk.initializeClaimLink(
-		token,
-		amount,
-		expiration,
-		sender,
-		types.CLSourceP2P,
-		nil, nil, nil,
-	)
+	claimLink = new(ClaimLink)
+	err = claimLink.new(sdk, &params, &linkKey, transferId)
+	return
 }
 
 func (sdk *SDK) GetSenderHistory(
@@ -135,7 +150,7 @@ func (sdk *SDK) GetLimits(token types.Token) (limits *types.TransferLimits, err 
 		MaxAmountUSD string `json:"max_transfer_amount_usd"`
 	}{}
 	err = json.Unmarshal(apiResponse, &apiResponseModel)
-	if !apiResponseModel.Success { // Will be empty string since success is a bool field
+	if !apiResponseModel.Success {
 		return nil, errors.New("error fetching limits: " + apiResponseModel.Error)
 	}
 	minTransferAmount, _ := new(big.Int).SetString(apiResponseModel.MinAmount, 10)
@@ -150,57 +165,13 @@ func (sdk *SDK) GetLimits(token types.Token) (limits *types.TransferLimits, err 
 	}, nil
 }
 
-func (sdk *SDK) initializeClaimLink(
-	token types.Token,
-	amount *big.Int,
-	expiration *big.Int,
-	sender common.Address,
-	source types.CLSource,
-	transferId *common.Address,
-	fee *types.CLFee,
-	totalAmount *big.Int,
-) (claimLink *ClaimLink, err error) {
-	var pk *ecdsa.PrivateKey
-	if transferId == nil {
-		pk, err = helpers.PrivateKey(sdk.GetRandomBytes)
-		if err != nil {
-			return nil, err
-		}
-		address, err := helpers.AddressFromPrivateKey(pk)
-		if err != nil {
-			return nil, err
-		}
-		transferId = &address
-	}
-	if fee == nil || totalAmount == nil {
-		fee, totalAmount, err = sdk.GetCurrentFee(token, sender, *transferId, expiration, amount)
-		if err != nil {
-			return nil, err
-		}
-	}
-	claimLink = &ClaimLink{
-		SDK:         sdk,
-		Token:       token,
-		Amount:      amount,
-		Expiration:  expiration,
-		Sender:      sender,
-		Source:      source,
-		TransferId:  *transferId,
-		LinkKey:     pk,
-		Fee:         fee,
-		TotalAmount: totalAmount,
-	}
-	err = claimLink.Validate()
-	return
-}
-
 func (sdk *SDK) GetCurrentFee(
 	token types.Token,
 	sender common.Address,
 	transferId common.Address,
-	expiration *big.Int,
+	expiration int64,
 	amount *big.Int,
-) (fee *types.CLFee, totalAmount *big.Int, err error) {
+) (fee *types.ClaimLinkFee, totalAmount *big.Int, err error) {
 	feeB, err := sdk.Client.GetFee(
 		token,
 		sender,
@@ -234,7 +205,7 @@ func (sdk *SDK) GetCurrentFee(
 	if getFeeResp.FeeToken == types.ZeroAddress {
 		tokenType = types.TokenTypeNative
 	}
-	return &types.CLFee{
+	return &types.ClaimLinkFee{
 		Token: types.Token{
 			Type:    tokenType,
 			ChainId: token.ChainId,
@@ -246,11 +217,11 @@ func (sdk *SDK) GetCurrentFee(
 }
 
 func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) {
-	linkSource, err := sdk.GetLinkSourceFromClaimUrl(claimUrl)
+	linkSource, err := helpers.LinkSourceFromClaimUrl(claimUrl)
 	if err != nil {
 		return
 	}
-	if linkSource == types.CLSourceD {
+	if linkSource == types.LinkSourceDashboard {
 		// TODO handle
 		return nil, errors.New("not implemented yet")
 	}
@@ -303,9 +274,8 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 	}
 
 	claimLink = &ClaimLink{
-		SDK:     sdk,
-		Sender:  common.HexToAddress(cl["sender"].(string)),
-		ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
+		SDK:    sdk,
+		Sender: common.HexToAddress(cl["sender"].(string)),
 		Token: types.Token{
 			Type:    tokenType,
 			ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
@@ -314,7 +284,7 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 		},
 		Amount:      amount,
 		TotalAmount: totalAmount,
-		Fee: &types.CLFee{
+		Fee: types.ClaimLinkFee{
 			Token: types.Token{
 				Type:    feeTokenType,
 				ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
@@ -322,18 +292,11 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 			},
 			Amount: feeAmount,
 		},
-		Expiration:    big.NewInt(int64(cl["expiration"].(float64))),
+		Expiration:    int64(cl["expiration"].(float64)),
 		TransferId:    common.HexToAddress(cl["transfer_id"].(string)),
 		EscrowAddress: common.HexToAddress(cl["escrow"].(string)),
-		Operations:    nil, // TODO
-		LinkKey:       decodedLink.LinkKey,
-		ClaimUrl:      &claimUrl,
-		ForRecipient:  false,
-		Status:        types.ClItemStatusFromString(cl["status"].(string)),
-		Source:        types.CLSource(cl["escrow"].(string)),
+		LinkKey:       &decodedLink.LinkKey,
+		Status:        types.ClaimLinkStatusFromString(cl["status"].(string)),
 	}
-	err = claimLink.Validate()
 	return
 }
-
-func (sdk *SDK) RetrieveClaimLink() {}

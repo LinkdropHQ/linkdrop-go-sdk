@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"github.com/LinkdropHQ/linkdrop-go-sdk"
+	linkdropCrypto "github.com/LinkdropHQ/linkdrop-go-sdk/crypto"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -11,6 +13,15 @@ import (
 	"math/big"
 	"os"
 )
+
+func getRandomBytes(length int64) []byte {
+	b := make([]byte, length)
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Fatalf("Failed to generate random bytes: %v", err)
+	}
+	return b
+}
 
 func signTypedData(data apitypes.TypedData) ([]byte, error) {
 	privateKey, err := crypto.ToECDSA(common.Hex2Bytes(os.Getenv("PRIVATE_KEY")))
@@ -24,50 +35,48 @@ func signTypedData(data apitypes.TypedData) ([]byte, error) {
 func main() {
 	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
-		types.DeploymentCBW,
-		utils.GetRandomBytes,
-		linkdrop.WithApiKey(os.Getenv("LINKDROP_API_KEY")),
-		linkdrop.WithMessageConfig(
-			linkdrop.MessageConfig{
-				MinEncryptionKeyLength: 64,
-				MaxEncryptionKeyLength: 128,
-				MaxTextLength:          1000,
+		os.Getenv("LINKDROP_API_KEY"),
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	link, err := sdk.ClaimLink(
+		linkdrop.ClaimLinkCreationParams{
+			Token: types.Token{
+				Type:    types.TokenTypeERC20,
+				ChainId: types.ChainIdBase,
+				Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
 			},
-		),
-	)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	link, err := sdk.CreateClaimLink(
-		types.Token{
-			Type:    types.TokenTypeNative,
-			ChainId: types.ChainIdBase,
+			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
+			Amount:     big.NewInt(100000),
+			Expiration: 1773159165,
 		},
-		big.NewInt(250000000000000000),
-		common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-		big.NewInt(1775195026),
+		getRandomBytes,
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
+	var nonce [linkdropCrypto.NonceLength]byte
+	copy(nonce[:], getRandomBytes(25))
 	err = link.AddMessage(
 		"Stay Based!",
-		64,
+		12,
 		signTypedData,
+		nonce,
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	decryptedMessage, err := link.DecryptSenderMessage(signTypedData)
+	decryptedMessage, err := link.DecryptSenderMessage()
 	if err != nil {
 		log.Fatalln(err)
 	}
 	log.Println("Decrypted message: ", decryptedMessage)
 
-	l, _, err := link.GenerateClaimUrl(signTypedData)
+	l, err := link.GenerateClaimUrl(nil)
 	if err != nil {
 		log.Fatalln(err)
 	}

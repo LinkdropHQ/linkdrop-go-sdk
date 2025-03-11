@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"github.com/LinkdropHQ/linkdrop-go-sdk"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"log"
@@ -22,59 +23,71 @@ func getRandomBytes(length int64) []byte {
 func main() {
 	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
-		types.DeploymentCBW,
-		getRandomBytes,
-		linkdrop.WithApiKey(os.Getenv("LINKDROP_API_KEY")),
+		os.Getenv("LINKDROP_API_KEY"),
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	// Native
-	clNative, err := sdk.CreateClaimLink(
-		types.Token{
-			Type:    types.TokenTypeNative,
-			ChainId: types.ChainIdBase,
+	clNative, err := sdk.ClaimLink(
+		linkdrop.ClaimLinkCreationParams{
+			Token: types.Token{
+				Type:    types.TokenTypeNative,
+				ChainId: types.ChainIdBase,
+			},
+			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
+			Amount:     big.NewInt(250000000000000000),
+			Expiration: 1775195026,
 		},
-		big.NewInt(250000000000000000),
-		common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-		big.NewInt(1775195026),
+		getRandomBytes,
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println(sdk, clNative)
+	log.Println(clNative)
 
-	// ERC20
-	clERC20, err := sdk.CreateClaimLink(
-		types.Token{
-			Type:    types.TokenTypeERC20,
-			ChainId: types.ChainIdBase,
-			Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+	// ERC20 claim link with pre-generated linkKey provided
+	// Any method can be used to generate ecdsa.PrivateKey
+	linkKey, err := helpers.PrivateKey(getRandomBytes)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	clERC20WithLinkKey, err := sdk.ClaimLinkWithLinkKey(
+		linkdrop.ClaimLinkCreationParams{
+			Token: types.Token{
+				Type:    types.TokenTypeERC20,
+				ChainId: types.ChainIdBase,
+				Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+			},
+			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
+			Amount:     big.NewInt(1000000000),
+			Expiration: 1775195026,
 		},
-		big.NewInt(1000000000),
-		common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-		big.NewInt(1000000000),
+		*linkKey,
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println(sdk, clERC20)
+	log.Println(clERC20WithLinkKey)
 
-	// ERC721
-	clERC721, err := sdk.CreateClaimLink(
-		types.Token{
-			Type:    types.TokenTypeERC721,
-			ChainId: types.ChainIdBase,
-			Address: common.HexToAddress("0x3319197b0d0f8ccd1087f2d2e47a8fb7c0710171"),
-			Id:      big.NewInt(5225),
+	// ERC20 claim link with transferId
+	transferId := common.HexToAddress("0xcc06431Bcb7E5BDf5632705db6Eb4e98123e3e78")
+	clERC20WithTransferId, err := sdk.ClaimLinkWithTransferId(
+		linkdrop.ClaimLinkCreationParams{
+			Token: types.Token{
+				Type:    types.TokenTypeERC20,
+				ChainId: types.ChainIdBase,
+				Address: common.HexToAddress("0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"),
+			},
+			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
+			Amount:     big.NewInt(1000000000),
+			Expiration: 1775195026,
 		},
-		big.NewInt(1),
-		common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-		big.NewInt(1000000000),
+		transferId,
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println(sdk, clERC721)
+	log.Println(clERC20WithTransferId)
 }

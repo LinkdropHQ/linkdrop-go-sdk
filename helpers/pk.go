@@ -9,10 +9,6 @@ import (
 	"math/big"
 )
 
-func PrivateKeyFromHex(privateKeyHex string) (*ecdsa.PrivateKey, error) {
-	return crypto.HexToECDSA(privateKeyHex)
-}
-
 func AddressFromPrivateKey(privateKey *ecdsa.PrivateKey) (common.Address, error) {
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)

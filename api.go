@@ -4,14 +4,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/LinkdropHQ/linkdrop-go-sdk/internal/helpers"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"log"
 	"math/big"
+	"strconv"
 )
 
 type Client struct {
-	config *Config
+	config *ClientConfig // Client scoped configuration - endpoints
 }
 
 // RedeemRecoveredLink allows a receiver to redeem a link that has been recovered.
@@ -76,31 +78,24 @@ func (c *Client) RedeemRecoveredLink(
 // - Ensure all required parameters are valid before calling this function.
 // - If optional parameters (sender, escrow, or token) are not provided, they will be ignored in the request body.
 func (c *Client) RedeemLink(
-	chainId types.ChainId,
-	receiver common.Address,
 	transferId common.Address,
+	token types.Token,
+	sender common.Address,
+	receiver common.Address,
+	escrow common.Address,
 	receiverSig []byte,
-	sender *common.Address,
-	escrow *common.Address,
-	token *types.Token,
 ) ([]byte, error) {
-	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
+	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
 	if err != nil {
 		return []byte{}, err
 	}
 	bodyRaw := map[string]string{
-		"receiver":     receiver.Hex(),
 		"transfer_id":  transferId.Hex(),
+		"token":        token.Address.Hex(),
+		"sender":       sender.Hex(),
+		"receiver":     receiver.Hex(),
+		"escrow":       escrow.Hex(),
 		"receiver_sig": "0x" + hex.EncodeToString(receiverSig),
-	}
-	if sender != nil {
-		bodyRaw["sender"] = sender.Hex()
-	}
-	if escrow != nil {
-		bodyRaw["escrow"] = escrow.Hex()
-	}
-	if token != nil {
-		bodyRaw["token"] = token.Address.Hex()
 	}
 	body, _ := json.Marshal(bodyRaw)
 	return helpers.Request(fmt.Sprintf("%s/redeem", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
@@ -169,11 +164,11 @@ func (c *Client) GetFee(
 	token types.Token,
 	sender common.Address,
 	transferId common.Address,
-	expiration *big.Int,
+	expiration int64,
 	amount *big.Int,
 ) ([]byte, error) {
-	if amount == nil || expiration == nil {
-		return nil, fmt.Errorf("amount and expiration are required")
+	if amount == nil {
+		return nil, fmt.Errorf("amount is required")
 	}
 	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
 	if err != nil {
@@ -189,7 +184,7 @@ func (c *Client) GetFee(
 		"sender":        sender.Hex(),
 		"token_type":    string(token.Type),
 		"transfer_id":   transferId.Hex(),
-		"expiration":    expiration.String(),
+		"expiration":    strconv.Itoa(int(expiration)),
 		"token_id":      tokenId,
 	})
 	return helpers.Request(fmt.Sprintf("%s/fee?%s", apiHost, query), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
@@ -211,7 +206,12 @@ func (c *Client) GetFee(
 //
 // Notes:
 // - The function dynamically determines the API host based on the token's chain ID.
-func (c *Client) GetHistory(token types.Token, sender common.Address, onlyActive bool, offset, limit int64) ([]byte, error) {
+func (c *Client) GetHistory(
+	token types.Token,
+	sender common.Address,
+	onlyActive bool,
+	offset, limit int64,
+) ([]byte, error) {
 	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
 	if err != nil {
 		return nil, err
@@ -263,16 +263,16 @@ func (c *Client) Deposit(
 	sender common.Address,
 	escrow common.Address,
 	transferId common.Address,
-	expiration *big.Int,
-	transaction *types.Transaction,
-	fee types.CLFee,
+	expiration int64,
+	transaction types.Transaction,
+	fee types.ClaimLinkFee,
 	amount *big.Int,
 	totalAmount *big.Int,
 	encryptedSenderMessage []byte,
 ) ([]byte, error) {
 	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
-	if expiration == nil || transaction == nil || amount == nil || totalAmount == nil {
-		return nil, fmt.Errorf("expiration, transaction, amount, and totalAmount are required")
+	if amount == nil || totalAmount == nil {
+		return nil, fmt.Errorf("amount and totalAmount are required")
 	}
 	bodyRaw := map[string]string{
 		"sender":            sender.Hex(),
@@ -280,7 +280,7 @@ func (c *Client) Deposit(
 		"transfer_id":       transferId.Hex(),
 		"token":             token.Address.Hex(),
 		"token_type":        string(token.Type),
-		"expiration":        expiration.String(),
+		"expiration":        strconv.Itoa(int(expiration)),
 		"tx_hash":           transaction.Hash.Hex(),
 		"fee_authorization": "0x" + helpers.ToHex(fee.Authorization),
 		"amount":            amount.String(),
@@ -321,7 +321,7 @@ func (c *Client) DepositWithAuthorization(
 	expiration *big.Int,
 	authorization []byte,
 	authorizationSelector string,
-	fee types.CLFee,
+	fee types.ClaimLinkFee,
 	amount *big.Int,
 	totalAmount *big.Int,
 	encryptedSenderMessage []byte,
@@ -333,23 +333,28 @@ func (c *Client) DepositWithAuthorization(
 	if expiration == nil || authorization == nil || amount == nil || totalAmount == nil {
 		return nil, fmt.Errorf("expiration, authorization, amount, and totalAmount are required")
 	}
-	body, err := json.Marshal(map[string]string{
-		"sender":                   sender.Hex(),
-		"escrow":                   escrow.Hex(),
-		"transfer_id":              transferId.Hex(),
-		"token":                    token.Address.Hex(),
-		"token_type":               string(token.Type),
-		"expiration":               expiration.String(),
-		"amount":                   amount.String(),
-		"authorization":            "0x" + hex.EncodeToString(authorization),
-		"authorization_selector":   authorizationSelector,
-		"fee_amount":               fee.Amount.String(),
-		"total_amount":             totalAmount.String(),
-		"fee_authorization":        "0x" + helpers.ToHex(fee.Authorization),
-		"encrypted_sender_message": helpers.ToHex(encryptedSenderMessage),
-	})
+	bodyRaw := map[string]string{
+		"sender":                 sender.Hex(),
+		"escrow":                 escrow.Hex(),
+		"transfer_id":            transferId.Hex(),
+		"token":                  token.Address.Hex(),
+		"token_type":             string(token.Type),
+		"expiration":             expiration.String(),
+		"amount":                 amount.String(),
+		"authorization":          "0x" + hex.EncodeToString(authorization),
+		"authorization_selector": authorizationSelector,
+		"fee_amount":             fee.Amount.String(),
+		"total_amount":           totalAmount.String(),
+		"fee_authorization":      "0x" + helpers.ToHex(fee.Authorization),
+	}
+	if encryptedSenderMessage != nil {
+		bodyRaw["encrypted_sender_message"] = helpers.ToHex(encryptedSenderMessage)
+	}
+	body, err := json.Marshal(bodyRaw)
+	log.Println(string(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
-	return helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	resp, err := helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	return resp, err
 }

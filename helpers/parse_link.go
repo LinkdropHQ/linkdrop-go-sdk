@@ -16,5 +16,5 @@ func ParseLink(
 			return
 		}
 	}
-	return decodedLink.SenderSig, decodedLink.LinkKey, nil
+	return decodedLink.SenderSignature, &decodedLink.LinkKey, nil
 }

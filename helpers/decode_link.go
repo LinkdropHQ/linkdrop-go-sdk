@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
@@ -83,19 +82,19 @@ func DecodeLink(link string) (*types.Link, error) {
 
 	// Decode transferId or generate from linkKey
 	var transferId common.Address
-	if params["transferId"] != "" {
-		transferIdBytes, err := base58.Decode(params["transferId"])
-		if err != nil {
-			return nil, err
-		}
-		transferId = common.BytesToAddress(transferIdBytes)
-	} else {
+	if params["transferId"] == "" {
 		// Derive wallet address from linkKey
 		privateKey, err := crypto.ToECDSA(linkKeyBytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive private key from linkKey: %w", err)
 		}
 		transferId = crypto.PubkeyToAddress(privateKey.PublicKey)
+	} else {
+		transferIdBytes, err := base58.Decode(params["transferId"])
+		if err != nil {
+			return nil, err
+		}
+		transferId = common.BytesToAddress(transferIdBytes)
 	}
 
 	// Parse chainId
@@ -105,22 +104,19 @@ func DecodeLink(link string) (*types.Link, error) {
 	}
 
 	l := &types.Link{
-		SenderSig:  senderSig,
-		LinkKey:    linkKey,
-		TransferId: transferId,
-		ChainId:    types.ChainId(chainId),
-		Version:    params["version"],
+		SenderSignature: senderSig,
+		LinkKey:         *linkKey,
+		TransferId:      transferId,
+		ChainId:         types.ChainId(chainId),
+		Version:         params["version"],
 	}
 
 	// Handle optional encryptionKey
 	if params["encryptionKey"] != "" {
-		var ek [32]byte
-		ekDecoded, err := hex.DecodeString(params["encryptionKey"])
-		if err != nil {
-			return nil, errors.New("invalid encryptionKey value")
+		l.Message = &types.EncryptedMessage{
+			Data:    nil,
+			LinkKey: types.MessageLinkKey(params["encryptionKey"]),
 		}
-		copy(ek[:], ekDecoded)
-		l.EncryptionKeyLinkParam = &ek
 	}
 
 	return l, nil
