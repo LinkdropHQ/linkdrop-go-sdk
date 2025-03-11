@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
@@ -114,16 +113,9 @@ func DecodeLink(link string) (*types.Link, error) {
 
 	// Handle optional encryptionKey
 	if params["encryptionKey"] != "" {
-		var ek [32]byte
-		ekDecoded, err := hex.DecodeString(params["encryptionKey"])
-		if err != nil {
-			return nil, errors.New("invalid encryptionKey value")
-		}
-		copy(ek[:], ekDecoded)
 		l.Message = &types.EncryptedMessage{
-			Data:          nil,
-			EncryptionKey: [32]byte{},
-			InitialKey:    ek,
+			Data:    nil,
+			LinkKey: types.MessageLinkKey(params["encryptionKey"]),
 		}
 	}
 

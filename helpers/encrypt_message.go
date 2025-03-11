@@ -12,40 +12,45 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
-func DecryptMessage(
+func MessageDecrypt(
 	message *types.EncryptedMessage,
 ) (string, error) {
-	encoded := message.Data[2:] // Remove length from message
-	return crypto.Decrypt(encoded, message.EncryptionKey)
+	if message == nil {
+		return "", errors.New("message is nil")
+	}
+	encryptionKey, err := message.LinkKey.MessageEncryptionKey()
+	if err != nil {
+		return "", err
+	}
+	// message.Data[2:] - message data with key len removed
+	return crypto.Decrypt(message.Data[2:], encryptionKey)
 }
 
-func EncryptMessage(
+func MessageEncrypt(
 	message string,
 	initialKey types.MessageInitialKey,
-	encryptionKeyLength int64,
+	linkKeyLength uint16,
 	nonce [crypto.NonceLength]byte,
 ) (encryptedMessage *types.EncryptedMessage, err error) {
-	if encryptionKeyLength > 0xFFFF {
-		return nil, errors.New("encryptionKeyLength exceeds 2 bytes")
+	if linkKeyLength > 0xFFFF {
+		return nil, errors.New("linkKeyLength exceeds 2 bytes")
 	}
-
-	encryptionKey, err := initialKey.MessageEncryptionKey(encryptionKeyLength)
-
+	linkKey := initialKey.LinkKey(linkKeyLength)
+	encryptionKey, err := linkKey.MessageEncryptionKey()
+	if err != nil {
+		return
+	}
 	encryptedSenderMessage, err := crypto.Encrypt([]byte(message), encryptionKey, nonce)
 	if err != nil {
 		return nil, err
 	}
-
-	encryptionKeyLengthB := make([]byte, 2)
-	binary.BigEndian.PutUint16(encryptionKeyLengthB, uint16(encryptionKeyLength))
-
-	// Build the result
-	result := &types.EncryptedMessage{
-		Data:          append(encryptionKeyLengthB[:], encryptedSenderMessage...),
-		InitialKey:    initialKey,
-		EncryptionKey: encryptionKey,
+	linkKeyLengthB := make([]byte, 2)
+	binary.BigEndian.PutUint16(linkKeyLengthB, uint16(len(linkKey)))
+	encryptedMessage = &types.EncryptedMessage{
+		Data:    append(linkKeyLengthB[:], encryptedSenderMessage...),
+		LinkKey: linkKey,
 	}
-	return result, nil
+	return
 }
 
 // MessageInitialKeyCreate creates a message encryption key
@@ -60,7 +65,8 @@ func MessageInitialKeyCreate(
 	if err != nil {
 		return
 	}
-	return MessageInitialKeyFromSignature(signature)
+	initialKey = MessageInitialKeyFromSignature(signature)
+	return
 }
 
 func MessageInitialKeyTypedData(
@@ -92,6 +98,6 @@ func MessageInitialKeyTypedData(
 
 func MessageInitialKeyFromSignature(
 	MessageEncryptionKeyTypedDataSignature []byte,
-) (initialKey types.MessageInitialKey, err error) {
-	return sha256.Sum256(MessageEncryptionKeyTypedDataSignature), nil
+) types.MessageInitialKey {
+	return sha256.Sum256(MessageEncryptionKeyTypedDataSignature)
 }

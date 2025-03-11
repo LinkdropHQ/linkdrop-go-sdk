@@ -36,13 +36,6 @@ func main() {
 	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
 		os.Getenv("LINKDROP_API_KEY"),
-		linkdrop.WithMessageConfig(
-			linkdrop.MessageConfig{
-				MinEncryptionKeyLength: 64,
-				MaxEncryptionKeyLength: 128,
-				MaxTextLength:          1000,
-			},
-		),
 	)
 	if err != nil {
 		log.Fatalln(err)
@@ -69,7 +62,7 @@ func main() {
 	copy(nonce[:], getRandomBytes(25))
 	err = link.AddMessage(
 		"Stay Based!",
-		64,
+		12,
 		signTypedData,
 		nonce,
 	)
@@ -77,7 +70,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	decryptedMessage, err := link.DecryptSenderMessage(signTypedData)
+	decryptedMessage, err := link.DecryptSenderMessage()
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -6,25 +6,31 @@ import (
 )
 
 type EncryptedMessage struct {
-	Data          []byte
-	EncryptionKey [32]byte
-	InitialKey    [32]byte
+	Data    []byte
+	LinkKey MessageLinkKey
 }
 
 type MessageInitialKey [32]byte
-type MessageEncryptionKey [32]byte
 
-func (mki *MessageInitialKey) MessageEncryptionKey(
-	encryptionKeyLength int64,
-) (encryptionKey MessageEncryptionKey, err error) {
-	encryptionKeyModified := base58.Encode(mki[:])
-	if int64(len(encryptionKeyModified)) > encryptionKeyLength {
-		encryptionKeyModified = encryptionKeyModified[:encryptionKeyLength]
+func (mki *MessageInitialKey) LinkKey(
+	length uint16,
+) MessageLinkKey {
+	initialKeyEncoded := base58.Encode(mki[:])
+	if len(initialKeyEncoded) > int(length) {
+		initialKeyEncoded = initialKeyEncoded[:length]
 	}
-	encryptionKeyModifiedBytes, err := base58.Decode(encryptionKeyModified)
+	return MessageLinkKey(initialKeyEncoded)
+}
+
+type MessageLinkKey string
+
+func (mlk *MessageLinkKey) MessageEncryptionKey() (encryptionKey MessageEncryptionKey, err error) {
+	initialKeyTrimmed, err := base58.Decode(string(*mlk))
 	if err != nil {
 		return
 	}
-	encryptionKey = sha256.Sum256(encryptionKeyModifiedBytes)
+	encryptionKey = sha256.Sum256(initialKeyTrimmed)
 	return
 }
+
+type MessageEncryptionKey [32]byte

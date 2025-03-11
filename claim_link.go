@@ -109,7 +109,7 @@ func (cl *ClaimLink) new(
 
 func (cl *ClaimLink) AddMessage(
 	message string,
-	encryptionKeyLength int64,
+	encryptionKeyLength uint16,
 	signTypedData types.SignTypedDataCallback,
 	nonce [crypto.NonceLength]byte,
 ) (err error) {
@@ -125,7 +125,7 @@ func (cl *ClaimLink) AddMessage(
 
 func (cl *ClaimLink) AddMessageWithInitialKey(
 	message string,
-	encryptionKeyLength int64,
+	encryptionKeyLength uint16,
 	initialKey types.MessageInitialKey,
 	nonce [crypto.NonceLength]byte,
 ) (err error) {
@@ -145,8 +145,25 @@ func (cl *ClaimLink) AddMessageWithInitialKey(
 	if encryptionKeyLength == 0 {
 		encryptionKeyLength = 12
 	}
+	cl.Message, err = helpers.MessageEncrypt(message, initialKey, encryptionKeyLength, nonce)
+	return
+}
 
-	cl.Message, err = helpers.EncryptMessage(message, initialKey, encryptionKeyLength, nonce)
+// AddMessageRaw allows to directly set Encrypted Message for the link
+// Verifies the validity of message provided
+// NOTE: message.Data should contain message.LinkKey length as the first byte. See helpers.MessageEncrypt
+func (cl *ClaimLink) AddMessageRaw(
+	originalMessage string,
+	message types.EncryptedMessage,
+) (err error) {
+	if cl.Status >= types.ClaimLinkStatusDeposited {
+		return errors.New("cannot add message after deposit")
+	}
+	decryptedMessage, err := helpers.MessageDecrypt(&message)
+	if err != nil || decryptedMessage != originalMessage {
+		return errors.New("message is not valid")
+	}
+	cl.Message = &message
 	return
 }
 
@@ -209,29 +226,14 @@ func (cl *ClaimLink) GetStatus() (status types.ClaimLinkStatus, operations []typ
 	return claimLink.Status, claimLink.Operations, nil
 }
 
-// TODO Separate signing logic
-func (cl *ClaimLink) DecryptSenderMessage(
-	signTypedData types.SignTypedDataCallback,
-) (message string, err error) {
+func (cl *ClaimLink) DecryptSenderMessage() (message string, err error) {
 	if cl.Message == nil {
-		return "", nil
+		return "", errors.New("message is not set")
 	}
-	if cl.Message.EncryptionKey == [crypto.KeyLength]byte{} {
-		messageInitialKey, err := helpers.MessageInitialKeyCreate(
-			cl.TransferId,
-			cl.Token.ChainId,
-			signTypedData,
-		)
-		if err != nil {
-			return "", err
-		}
-		cl.Message.InitialKey = messageInitialKey
-		cl.Message.EncryptionKey, err = messageInitialKey.MessageEncryptionKey(int64(cl.Message.Data[0]))
-		if err != nil {
-			return "", err
-		}
+	if cl.Message.LinkKey == "" {
+		return "", errors.New("message link key is not set")
 	}
-	return helpers.DecryptMessage(cl.Message)
+	return helpers.MessageDecrypt(cl.Message)
 }
 
 func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, err error) {

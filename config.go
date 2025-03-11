@@ -6,8 +6,8 @@ import (
 )
 
 type MessageConfig struct {
-	MinEncryptionKeyLength int64
-	MaxEncryptionKeyLength int64
+	MinEncryptionKeyLength uint16
+	MaxEncryptionKeyLength uint16
 	MaxTextLength          int64
 }
 
