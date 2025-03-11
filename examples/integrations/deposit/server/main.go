@@ -12,7 +12,6 @@ import (
 )
 
 type Payload struct {
-	Command    string         `json:"command"`
 	TransferId common.Address `json:"transferId"`
 	ClaimLink  struct {
 		Token struct {
@@ -24,11 +23,13 @@ type Payload struct {
 		Amount     string         `json:"amount"`
 		Expiration int64          `json:"expiration"`
 	} `json:"claimLink"`
+	TxHash string `json:"txHash"`
 }
 
 func main() {
+	command := os.Args[1]
 	var payload Payload
-	err := json.Unmarshal([]byte(os.Args[1]), &payload)
+	err := json.Unmarshal([]byte(os.Args[2]), &payload)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -60,7 +61,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	switch payload.Command {
+	switch command {
 	case "getDepositParams":
 		params, err := claimLink.GetDepositParams()
 		if err != nil {
@@ -68,5 +69,14 @@ func main() {
 		}
 		resp, _ := json.Marshal(params)
 		fmt.Println(string(resp))
+	case "registerDeposit":
+		err = claimLink.DepositRegister(types.Transaction{
+			Hash: common.HexToHash(payload.TxHash),
+			Type: types.TransactionTypeTx,
+		})
+		if err != nil {
+			fmt.Println("Error: ", err)
+		}
+		fmt.Println("Success")
 	}
 }
