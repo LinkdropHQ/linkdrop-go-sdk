@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"math/big"
-	"strconv"
 	"strings"
 )
 
@@ -243,7 +242,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, e
 			"depositETH",
 			cl.TransferId,
 			cl.TotalAmount.String(),
-			strconv.Itoa(int(cl.Expiration)),
+			big.NewInt(cl.Expiration),
 			cl.Fee.Amount.String(),
 			cl.Fee.Authorization,
 			messageData,
@@ -254,7 +253,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, e
 			cl.Token.Address,
 			cl.TransferId,
 			cl.TotalAmount,
-			cl.Expiration,
+			big.NewInt(cl.Expiration),
 			cl.Fee.Token.Address,
 			cl.Fee.Amount,
 			cl.Fee.Authorization,
@@ -294,6 +293,10 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 }
 
 func (cl *ClaimLink) DepositRegister(transaction types.Transaction) (err error) {
+	var messageData []byte
+	if cl.Message != nil {
+		messageData = cl.Message.Data
+	}
 	_, err = cl.SDK.Client.Deposit(
 		cl.Token,
 		cl.Sender,
@@ -304,7 +307,7 @@ func (cl *ClaimLink) DepositRegister(transaction types.Transaction) (err error) 
 		cl.Fee,
 		cl.Amount,
 		cl.TotalAmount,
-		cl.Message.Data,
+		messageData,
 	)
 	if err != nil {
 		return

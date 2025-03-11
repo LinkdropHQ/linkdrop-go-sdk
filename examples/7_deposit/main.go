@@ -64,7 +64,7 @@ func main() {
 			},
 			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
 			Amount:     big.NewInt(100000),
-			Expiration: 1695985897,
+			Expiration: 1773234550,
 		},
 		getRandomBytes,
 	)
