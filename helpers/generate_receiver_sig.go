@@ -32,7 +32,7 @@ func GenerateReceiverSig(linkKey *ecdsa.PrivateKey, receiver common.Address) ([]
 	messageHash.Write(receiver.Bytes())
 
 	eip191Hash := sha3.NewLegacyKeccak256()
-	eip191Hash.Write(append(append([]byte("\x19Ethereum Signed Message:\n"), byte(32)), messageHash.Sum(nil)...))
+	eip191Hash.Write(append(append([]byte("\x19Ethereum Signed Message:\n"), []byte{51, 50}...), messageHash.Sum(nil)...))
 
 	signature, err := crypto.Sign(eip191Hash.Sum(nil), linkKey)
 	if signature[64] < 27 {
