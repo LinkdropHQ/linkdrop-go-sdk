@@ -10,11 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
-	"github.com/mr-tron/base58"
 )
-
-type MessageInitialKey [32]byte
-type MessageEncryptionKey [32]byte
 
 func DecryptMessage(
 	message *types.EncryptedMessage,
@@ -25,24 +21,17 @@ func DecryptMessage(
 
 func EncryptMessage(
 	message string,
-	transferID common.Address,
-	chainID types.ChainId,
+	initialKey types.MessageInitialKey,
 	encryptionKeyLength int64,
-	getRandomBytes types.RandomBytesCallback,
-	signTypedData types.SignTypedDataCallback,
+	nonce [crypto.NonceLength]byte,
 ) (encryptedMessage *types.EncryptedMessage, err error) {
 	if encryptionKeyLength > 0xFFFF {
 		return nil, errors.New("encryptionKeyLength exceeds 2 bytes")
 	}
 
-	initialKey, err := MessageInitialKeyCreate(transferID, chainID, signTypedData)
-	if err != nil {
-		return
-	}
-
 	encryptionKey, err := initialKey.MessageEncryptionKey(encryptionKeyLength)
 
-	encryptedSenderMessage, err := crypto.Encrypt([]byte(message), encryptionKey, [24]byte{}, getRandomBytes)
+	encryptedSenderMessage, err := crypto.Encrypt([]byte(message), encryptionKey, nonce)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +55,7 @@ func MessageInitialKeyCreate(
 	transferId common.Address,
 	chainId types.ChainId,
 	signTypedData types.SignTypedDataCallback,
-) (initialKey MessageInitialKey, err error) {
+) (initialKey types.MessageInitialKey, err error) {
 	signature, err := signTypedData(MessageInitialKeyTypedData(transferId, chainId))
 	if err != nil {
 		return
@@ -103,21 +92,6 @@ func MessageInitialKeyTypedData(
 
 func MessageInitialKeyFromSignature(
 	MessageEncryptionKeyTypedDataSignature []byte,
-) (initialKey MessageInitialKey, err error) {
+) (initialKey types.MessageInitialKey, err error) {
 	return sha256.Sum256(MessageEncryptionKeyTypedDataSignature), nil
-}
-
-func (meki *MessageInitialKey) MessageEncryptionKey(
-	encryptionKeyLength int64,
-) (encryptionKey MessageEncryptionKey, err error) {
-	encryptionKeyModified := base58.Encode(meki[:])
-	if int64(len(encryptionKeyModified)) > encryptionKeyLength {
-		encryptionKeyModified = encryptionKeyModified[:encryptionKeyLength]
-	}
-	encryptionKeyModifiedBytes, err := base58.Decode(encryptionKeyModified)
-	if err != nil {
-		return
-	}
-	encryptionKey = sha256.Sum256(encryptionKeyModifiedBytes)
-	return
 }

@@ -107,41 +107,46 @@ func (cl *ClaimLink) new(
 	return
 }
 
-// TODO separate signing
 func (cl *ClaimLink) AddMessage(
 	message string,
 	encryptionKeyLength int64,
 	signTypedData types.SignTypedDataCallback,
-	getRandomBytes types.RandomBytesCallback,
+	nonce [crypto.NonceLength]byte,
 ) (err error) {
-	if encryptionKeyLength == 0 {
-		encryptionKeyLength = 12
+	if signTypedData == nil {
+		return errors.New("signTypedData callback is required")
 	}
+	initialKey, err := helpers.MessageInitialKeyCreate(cl.TransferId, cl.Token.ChainId, signTypedData)
+	if err != nil {
+		return
+	}
+	return cl.AddMessageWithInitialKey(message, encryptionKeyLength, initialKey, nonce)
+}
+
+func (cl *ClaimLink) AddMessageWithInitialKey(
+	message string,
+	encryptionKeyLength int64,
+	initialKey types.MessageInitialKey,
+	nonce [crypto.NonceLength]byte,
+) (err error) {
 	if cl.Status >= types.ClaimLinkStatusDeposited {
 		return errors.New("cannot add message after deposit")
 	}
 	if len(message) == 0 {
 		return errors.New("message text is required")
 	}
-	if signTypedData == nil {
-		return errors.New("signTypedData callback is required")
-	}
 	if int64(len(message)) > cl.SDK.config.messageConfig.MaxTextLength {
 		return errors.New("message text length is too long")
 	}
 	if encryptionKeyLength > cl.SDK.config.messageConfig.MaxEncryptionKeyLength ||
 		encryptionKeyLength < cl.SDK.config.messageConfig.MinEncryptionKeyLength {
-		return errors.New("message text length is too long")
+		return errors.New("wrong encryption key length")
+	}
+	if encryptionKeyLength == 0 {
+		encryptionKeyLength = 12
 	}
 
-	cl.Message, err = helpers.EncryptMessage(
-		message,
-		cl.TransferId,
-		cl.Token.ChainId,
-		encryptionKeyLength,
-		getRandomBytes,
-		signTypedData,
-	)
+	cl.Message, err = helpers.EncryptMessage(message, initialKey, encryptionKeyLength, nonce)
 	return
 }
 

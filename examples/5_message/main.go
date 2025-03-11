@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"github.com/LinkdropHQ/linkdrop-go-sdk"
+	linkdropCrypto "github.com/LinkdropHQ/linkdrop-go-sdk/crypto"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -64,11 +65,13 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	var nonce [linkdropCrypto.NonceLength]byte
+	copy(nonce[:], getRandomBytes(25))
 	err = link.AddMessage(
 		"Stay Based!",
 		64,
 		signTypedData,
-		getRandomBytes,
+		nonce,
 	)
 	if err != nil {
 		log.Fatalln(err)

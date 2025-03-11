@@ -1,11 +1,8 @@
 package crypto
 
 import (
-	"encoding/hex"
 	"errors"
-	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"golang.org/x/crypto/nacl/secretbox"
-	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -15,21 +12,6 @@ const (
 	TypeLength  = 1
 )
 
-func Keccak256(input string) string {
-	hash := sha3.NewLegacyKeccak256()
-	hash.Write([]byte(input))
-	return hex.EncodeToString(hash.Sum(nil))
-}
-
-// Converts a hex string to a byte array.
-func fromHex(hexStr string) ([]byte, error) {
-	bytes, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return nil, err
-	}
-	return bytes, nil
-}
-
 // Encodes the type as a single byte.
 func encodeTypeByte(t byte) []byte {
 	return []byte{t}
@@ -37,17 +19,12 @@ func encodeTypeByte(t byte) []byte {
 
 // Encrypt Encrypts a message using nacl.secretbox with TYPE_0 format:
 // [type(1 byte), iv(24 bytes), sealed(...)] -> Hex encoded.
+// NOTE: iv can be provided as a random [NonceLength]byte array
 func Encrypt(
 	message []byte,
 	symKey [KeyLength]byte,
 	iv [NonceLength]byte,
-	getRandomBytes types.RandomBytesCallback,
 ) (encryptedMessage []byte, err error) {
-	// Determine the IV (nonce)
-	if iv == [NonceLength]byte{} {
-		copy(iv[:], getRandomBytes(NonceLength))
-	}
-
 	// Encrypt the message with secretbox
 	var naclKey [KeyLength]byte
 	copy(naclKey[:], symKey[:])
