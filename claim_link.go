@@ -37,10 +37,10 @@ type ClaimLink struct {
 }
 
 type ClaimLinkCreationParams struct {
-	Token      types.Token
-	Sender     common.Address
-	Amount     *big.Int
-	Expiration int64
+	Token      types.Token    `json:"token"`
+	Sender     common.Address `json:"sender"`
+	Amount     *big.Int       `json:"amount"`
+	Expiration int64          `json:"expiration"`
 }
 
 func (cl *ClaimLink) newWithLinkKey(

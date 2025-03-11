@@ -2,6 +2,7 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"errors"
 	"github.com/ethereum/go-ethereum/common"
 	"math/big"
@@ -112,10 +113,23 @@ type ClaimLinkOperation struct {
 }
 
 type ClaimLinkDepositParams struct {
-	ChainId ChainId
-	Value   *big.Int
-	Data    []byte
-	To      common.Address
+	ChainId ChainId        `json:"chainId"`
+	Value   *big.Int       `json:"value"`
+	Data    []byte         `json:"data"`
+	To      common.Address `json:"to"`
+}
+
+func (cldp ClaimLinkDepositParams) MarshalJSON() ([]byte, error) {
+	type Alias ClaimLinkDepositParams
+	return json.Marshal(&struct {
+		Data  string `json:"data"`
+		Value string `json:"value"`
+		*Alias
+	}{
+		Data:  "0x" + common.Bytes2Hex(cldp.Data),
+		Value: cldp.Value.String(),
+		Alias: (*Alias)(&cldp),
+	})
 }
 
 // Link
