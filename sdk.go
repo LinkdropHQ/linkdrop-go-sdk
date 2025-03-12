@@ -38,18 +38,19 @@ func Init(baseUrl string, apiKey string, opts ...Option) (*SDK, error) {
 
 	var sdkConfig SDKConfig
 	sdkConfig.applyDefaults()
+	clientConfig := &ClientConfig{
+		apiKey: apiKey,
+		apiURL: constants.ApiURL,
+	}
 	for _, opt := range opts {
-		opt(&sdkConfig)
+		opt(&sdkConfig, clientConfig)
 	}
 	sdkConfig.baseURL = baseUrl
 
 	return &SDK{
 		config: sdkConfig,
 		Client: &Client{
-			config: &ClientConfig{
-				apiKey: apiKey,
-				apiURL: constants.ApiURL,
-			},
+			config: clientConfig,
 		},
 	}, nil
 }

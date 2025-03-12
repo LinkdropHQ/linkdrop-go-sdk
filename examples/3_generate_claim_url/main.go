@@ -35,6 +35,7 @@ func main() {
 	sdk, err := linkdrop.Init(
 		"https://p2p.linkdrop.io",
 		os.Getenv("LINKDROP_API_KEY"),
+		linkdrop.WithApiUrl("https://escrow-api.linkdrop.io/v3"),
 	)
 	if err != nil {
 		log.Fatalln(err)
