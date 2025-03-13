@@ -1,17 +1,26 @@
 package helpers
 
 import (
+	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
-func LinkSignatureTypedData(
+func RecoveredLinkTypedData(
 	linkKeyId common.Address,
 	transferId common.Address,
-	domain apitypes.TypedDataDomain,
+	chainId types.ChainId,
+	escrowVersion string,
+	escrow common.Address,
 ) apitypes.TypedData {
 	return apitypes.TypedData{
-		Domain:      domain,
+		Domain: apitypes.TypedDataDomain{
+			Name:              "LinkdropEscrow",
+			Version:           escrowVersion,
+			ChainId:           math.NewHexOrDecimal256(int64(chainId)),
+			VerifyingContract: escrow.Hex(),
+		},
 		PrimaryType: "Transfer",
 		Types: apitypes.Types{
 			"EIP712Domain": {

@@ -9,20 +9,19 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const linkWallet = ethers.Wallet.createRandom();
 const claimLinkKey = linkWallet.privateKey;
 const transferId = linkWallet.address;
-const claimLink = {
-    token: {
-        type: "ERC20",
-        chainId: 8453,
-        address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
-    },
-    sender: wallet.address,
-    amount: "100000",
-    expiration: 1773159165,
-}
 
 const payload = {
     transferId: transferId,
-    claimLink
+    claimLink: {
+        token: {
+            type: "ERC20",
+            chainId: 8453,
+            address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        },
+        sender: wallet.address,
+        amount: "100000",
+        expiration: 1773159165,
+    }
 }
 
 function requestDataToSign(payload) {

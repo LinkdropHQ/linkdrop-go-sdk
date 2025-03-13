@@ -21,10 +21,9 @@ func EncodeLink(claimHost string, link types.Link) string {
 
 	// Handle optional SenderSig
 	if link.SenderSignature != nil {
-		sigLength := len(link.SenderSignature) - 1 // 1st byte is sig length
 		sig := base58.Encode(link.SenderSignature)
 		return fmt.Sprintf("%s/#/code?k=%s&sg=%s&i=%s&c=%s&v=3&sgl=%d&src=p2p%s",
-			claimHost, linkKey, sig, transferId, chainId, sigLength, encryptionKey)
+			claimHost, linkKey, sig, transferId, chainId, len(link.SenderSignature), encryptionKey)
 	}
 
 	// If SenderSig is not provided
