@@ -24,7 +24,7 @@ type ClaimLink struct {
 	Amount *big.Int
 	Sender common.Address
 
-	Fee         types.ClaimLinkFee
+	Fee         *types.ClaimLinkFee
 	TotalAmount *big.Int
 
 	Message *types.EncryptedMessage
@@ -75,13 +75,18 @@ func (cl *ClaimLink) new(
 		return
 	}
 	// Fee
-	fee, totalAmount, err := sdk.GetCurrentFee(
-		params.Token,
-		params.Sender,
-		transferId,
-		params.Expiration,
-		params.Amount,
-	)
+	var fee *types.ClaimLinkFee
+	var totalAmount *big.Int
+	if params.Amount != nil {
+		fee, totalAmount, err = sdk.GetCurrentFee(
+			params.Token,
+			params.Sender,
+			transferId,
+			params.Expiration,
+			params.Amount,
+		)
+	}
+
 	if err != nil {
 		return
 	}
@@ -96,7 +101,7 @@ func (cl *ClaimLink) new(
 		Amount: params.Amount,
 		Sender: params.Sender,
 
-		Fee:         *fee,
+		Fee:         fee,
 		TotalAmount: totalAmount,
 
 		EscrowAddress: sdk.config.escrowContractAddress,
@@ -236,6 +241,10 @@ func (cl *ClaimLink) DecryptSenderMessage() (message string, err error) {
 }
 
 func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, err error) {
+	if cl.Fee == nil {
+		return nil, errors.New("claim link was initialized without amount. Fee is not set")
+	}
+
 	var messageData []byte
 	if cl.Message != nil {
 		messageData = cl.Message.Data
@@ -272,7 +281,7 @@ func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, e
 		return nil, err
 	}
 
-	value, err := helpers.DefineValue(cl.Token, cl.Fee, cl.TotalAmount)
+	value, err := helpers.DefineValue(cl.Token, *cl.Fee, cl.TotalAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -299,6 +308,9 @@ func (cl *ClaimLink) Deposit(sendTransaction types.SendTransactionCallback) (txH
 }
 
 func (cl *ClaimLink) DepositRegister(transaction types.Transaction) (err error) {
+	if cl.Fee == nil {
+		return errors.New("claim link was initialized without amount. Fee is not set")
+	}
 	var messageData []byte
 	if cl.Message != nil {
 		messageData = cl.Message.Data
@@ -310,7 +322,7 @@ func (cl *ClaimLink) DepositRegister(transaction types.Transaction) (err error) 
 		cl.TransferId,
 		cl.Expiration,
 		transaction,
-		cl.Fee,
+		*cl.Fee,
 		cl.Amount,
 		cl.TotalAmount,
 		messageData,
@@ -348,7 +360,7 @@ func (cl *ClaimLink) UpdateAmount(amount *big.Int) (err error) {
 
 	cl.Amount = amount
 	cl.TotalAmount = feeData.TotalAmount
-	cl.Fee = feeData.Fee
+	cl.Fee = &feeData.Fee
 	return
 }
 

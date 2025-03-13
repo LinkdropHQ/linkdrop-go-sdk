@@ -26,7 +26,6 @@ const payload = {
             address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
         },
         sender: wallet.address,
-        amount: "100000",
         expiration: 1773159165,
     }
 }
@@ -62,7 +61,7 @@ async function signTypedData(typedData) {
 }
 
 function buildLink(signature) {
-    const signatureLength = (signature).length - 2 / 2 // without 0x (-2) prefix in bytes (/2)
+    const signatureLength = ((signature).length - 2) / 2 // without 0x (-2) prefix in bytes (/2)
     console.log(`Recovered Link:`)
     console.log(`https://p2p.linkdrop.io/#/code?k=${linkKey}&sg=${ethers.encodeBase58(signature)}&i=${transferId}&c=${chainId}&v=3&sgl=${signatureLength}&src=p2p`)
 }

@@ -285,7 +285,7 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 		},
 		Amount:      amount,
 		TotalAmount: totalAmount,
-		Fee: types.ClaimLinkFee{
+		Fee: &types.ClaimLinkFee{
 			Token: types.Token{
 				Type:    feeTokenType,
 				ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
