@@ -287,6 +287,7 @@ func (c *Client) Deposit(
 		"fee_amount":        fee.Amount.String(),
 		"total_amount":      totalAmount.String(),
 		"fee_token":         fee.Token.Address.Hex(),
+		"transaction_type":  string(transaction.Type),
 	}
 
 	if encryptedSenderMessage != nil {
