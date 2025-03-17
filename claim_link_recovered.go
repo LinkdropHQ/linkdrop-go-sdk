@@ -24,7 +24,7 @@ type ClaimLinkRecovered struct {
 	SenderSignature []byte            // SenderSignature - a sender's signature that allows the link redemption with LinkKeyId instead of an original LinkKey
 }
 
-func (clr *ClaimLinkRecovered) GetRecoveredLinkTypedData(
+func (clr *ClaimLinkRecovered) GetTypedData(
 	linkKeyId common.Address,
 ) (*apitypes.TypedData, error) {
 	escrowVersion, err := helpers.DefineEscrowVersion(clr.EscrowAddress)
@@ -54,7 +54,7 @@ func (clr *ClaimLinkRecovered) GenerateClaimUrl(
 	if err != nil {
 		return
 	}
-	typedData, err := clr.GetRecoveredLinkTypedData(linkKeyId)
+	typedData, err := clr.GetTypedData(linkKeyId)
 	if err != nil {
 		return
 	}

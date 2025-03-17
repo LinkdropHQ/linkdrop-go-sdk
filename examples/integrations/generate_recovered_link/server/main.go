@@ -7,7 +7,6 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"log"
-	"math/big"
 	"os"
 )
 
@@ -20,9 +19,6 @@ type Payload struct {
 			ChainId types.ChainId   `json:"chainId"`
 			Address common.Address  `json:"address"`
 		} `json:"token"`
-		Sender     common.Address `json:"sender"`
-		Amount     string         `json:"amount"`
-		Expiration int64          `json:"expiration"`
 	} `json:"claimLink"`
 }
 
@@ -42,20 +38,14 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	//// ERC20
-	amount, _ := new(big.Int).SetString(payload.ClaimLink.Amount, 10)
-	claimLink, err := sdk.ClaimLinkWithTransferId(
-		linkdrop.ClaimLinkCreationParams{
-			Token: types.Token{
-				Type:    payload.ClaimLink.Token.Type,
-				ChainId: payload.ClaimLink.Token.ChainId,
-				Address: payload.ClaimLink.Token.Address,
-			},
-			Sender:     payload.ClaimLink.Sender,
-			Amount:     amount,
-			Expiration: payload.ClaimLink.Expiration,
-		},
+	claimLink, err := sdk.ClaimLinkRecovered(
 		payload.TransferId,
+		types.Token{
+			Type:    payload.ClaimLink.Token.Type,
+			ChainId: payload.ClaimLink.Token.ChainId,
+			Address: payload.ClaimLink.Token.Address,
+		},
+		nil, nil,
 	)
 	if err != nil {
 		log.Fatalln(err)
@@ -63,7 +53,7 @@ func main() {
 
 	switch command {
 	case "getRecoveredLinkTypedData":
-		params, err := claimLink.GetRecoveredLinkTypedData(payload.LinkKeyId)
+		params, err := claimLink.GetTypedData(payload.LinkKeyId)
 		if err != nil {
 			log.Fatalln(err)
 		}
