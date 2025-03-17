@@ -7,7 +7,6 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"log"
 	"math/big"
 	"strconv"
 )
@@ -38,13 +37,12 @@ type Client struct {
 // - Ensure all required parameters are valid and signatures are properly formed.
 // - The API validates sender, receiver, and escrow information against the signatures.
 func (c *Client) RedeemRecoveredLink(
-	receiver common.Address,
 	transferId common.Address,
-	receiverSig []byte,
-	senderSig []byte,
-	sender common.Address,
-	escrow common.Address,
 	token types.Token,
+	sender common.Address,
+	receiver common.Address,
+	escrow common.Address,
+	receiverSig []byte,
 ) ([]byte, error) {
 	body, _ := json.Marshal(map[string]string{
 		"receiver":     receiver.Hex(),
@@ -52,8 +50,8 @@ func (c *Client) RedeemRecoveredLink(
 		"escrow":       escrow.Hex(),
 		"transfer_id":  transferId.Hex(),
 		"receiver_sig": "0x" + hex.EncodeToString(receiverSig),
-		"sender_sig":   "0x" + hex.EncodeToString(senderSig),
-		"token":        token.Address.Hex(),
+
+		"token": token.Address.Hex(),
 	})
 	return helpers.Request(fmt.Sprintf("%s/redeem-recovered", c.config.apiURL), "POST", helpers.DefineHeaders(c.config.apiKey), body)
 }
@@ -84,8 +82,10 @@ func (c *Client) RedeemLink(
 	receiver common.Address,
 	escrow common.Address,
 	receiverSig []byte,
+	senderSig []byte,
 ) ([]byte, error) {
 	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
+	apiEndpoint := "%s/redeem"
 	if err != nil {
 		return []byte{}, err
 	}
@@ -97,8 +97,12 @@ func (c *Client) RedeemLink(
 		"escrow":       escrow.Hex(),
 		"receiver_sig": "0x" + hex.EncodeToString(receiverSig),
 	}
+	if senderSig != nil {
+		bodyRaw["sender_sig"] = "0x" + hex.EncodeToString(senderSig)
+		apiEndpoint = "%s/redeem-recovered"
+	}
 	body, _ := json.Marshal(bodyRaw)
-	return helpers.Request(fmt.Sprintf("%s/redeem", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	return helpers.Request(fmt.Sprintf(apiEndpoint, apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
 }
 
 // GetTransferStatus retrieves the payment status of a transfer using its unique transfer ID.
@@ -352,7 +356,6 @@ func (c *Client) DepositWithAuthorization(
 		bodyRaw["encrypted_sender_message"] = helpers.ToHex(encryptedSenderMessage)
 	}
 	body, err := json.Marshal(bodyRaw)
-	log.Println(string(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}

@@ -76,7 +76,7 @@ func main() {
 	}
 	log.Println("Decrypted message: ", decryptedMessage)
 
-	l, err := link.GenerateClaimUrl()
+	l, err := link.ClaimUrl()
 	if err != nil {
 		log.Fatalln(err)
 	}

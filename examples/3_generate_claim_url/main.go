@@ -58,7 +58,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	url, err := clERC20.GenerateClaimUrl() // Sender signature is nil since we're generating a non-recovered link here
+	url, err := clERC20.ClaimUrl() // Sender signature is nil since we're generating a non-recovered link here
 	if err != nil {
 		log.Fatalln(err)
 	}

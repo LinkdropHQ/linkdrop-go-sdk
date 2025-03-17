@@ -82,6 +82,7 @@ func (sdk *SDK) ClaimLink(
 
 // ClaimLinkWithTransferId creates a new ClaimLink setting with provided transferId
 // NOTE: the generated link will be created without linkKey and will lack some functionality
+// NOTE: this method creates ClaimLink and not ClaimLinkRecovered. This type supports deposit functionality.
 func (sdk *SDK) ClaimLinkWithTransferId(
 	params ClaimLinkCreationParams,
 	transferId common.Address,
@@ -102,6 +103,30 @@ func (sdk *SDK) ClaimLinkWithLinkKey(
 	}
 	claimLink = new(ClaimLink)
 	err = claimLink.new(sdk, &params, &linkKey, transferId)
+	return
+}
+
+// ClaimLinkRecovered creates a new ClaimLinkRecovered.
+// Recovered link doesn't support deposit and used to re-create the claim link with transferId in case linkKey was lost.
+// NOTE: If you're looking for deposit functionality for ClaimLink by transferId see ClaimLinkWithTransferId method.
+func (sdk *SDK) ClaimLinkRecovered(
+	transferId common.Address,
+	token types.Token,
+	message *types.EncryptedMessage,
+	senderSignature []byte,
+) (claimLinkRecovered *ClaimLinkRecovered, err error) {
+	err = token.Validate()
+	if err != nil {
+		return
+	}
+	claimLinkRecovered = &ClaimLinkRecovered{
+		SDK:             sdk,
+		TransferId:      transferId,
+		Token:           token,
+		EscrowAddress:   sdk.config.escrowContractAddress,
+		Message:         message,
+		SenderSignature: senderSignature,
+	}
 	return
 }
 
@@ -217,7 +242,8 @@ func (sdk *SDK) GetCurrentFee(
 	}, totalAmount, err
 }
 
-func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) {
+// GetClaimLink creates a ClaimLink or ClaimLinkRecovered from url and returns them as IClaimLinkRedeemable
+func (sdk *SDK) GetClaimLink(claimUrl string) (redeemableClaimLink IClaimLinkRedeemable, err error) {
 	linkSource, err := helpers.LinkSourceFromClaimUrl(claimUrl)
 	if err != nil {
 		return
@@ -274,7 +300,25 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (claimLink *ClaimLink, err error) 
 		feeTokenType = types.TokenTypeNative
 	}
 
-	claimLink = &ClaimLink{
+	if decodedLink.SenderSignature != nil {
+		redeemableClaimLink = &ClaimLinkRecovered{
+			SDK:        sdk,
+			TransferId: common.HexToAddress(cl["transfer_id"].(string)),
+			Sender:     common.HexToAddress(cl["sender"].(string)),
+			Token: types.Token{
+				Type:    tokenType,
+				ChainId: types.ChainId(int64(cl["chain_id"].(float64))),
+				Address: common.HexToAddress(cl["token"].(string)),
+				Id:      tokenId,
+			},
+			EscrowAddress:   common.HexToAddress(cl["escrow"].(string)),
+			LinkKey:         &decodedLink.LinkKey,
+			SenderSignature: decodedLink.SenderSignature,
+		}
+		return
+	}
+
+	redeemableClaimLink = &ClaimLink{
 		SDK:    sdk,
 		Sender: common.HexToAddress(cl["sender"].(string)),
 		Token: types.Token{

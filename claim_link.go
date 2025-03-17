@@ -9,7 +9,6 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"math/big"
 	"strings"
 )
@@ -42,33 +41,12 @@ type ClaimLinkCreationParams struct {
 	Expiration int64          `json:"expiration"`
 }
 
-func (cl *ClaimLink) newWithLinkKey(
-	sdk *SDK,
-	params *ClaimLinkCreationParams,
-	linkKey ecdsa.PrivateKey,
-) (err error) {
-	// Transfer Id
-	transferId, err := helpers.AddressFromPrivateKey(&linkKey)
-	if err != nil {
-		return
-	}
-	return cl.new(sdk, params, &linkKey, transferId)
-}
-
 func (cl *ClaimLink) new(
 	sdk *SDK,
 	params *ClaimLinkCreationParams,
 	linkKey *ecdsa.PrivateKey,
 	transferId common.Address,
 ) (err error) {
-	// Validating params
-	if params == nil {
-		return errors.New("params is required")
-	}
-	// SDK should be passed to access LinkDrop API via Client
-	if sdk == nil {
-		return errors.New("params.SDK is required")
-	}
 	// Token
 	err = params.Token.Validate()
 	if err != nil {
@@ -193,6 +171,7 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 		receiver,
 		cl.EscrowAddress,
 		receiverSig,
+		nil,
 	)
 	if err != nil {
 		return
@@ -364,68 +343,14 @@ func (cl *ClaimLink) UpdateAmount(amount *big.Int) (err error) {
 	return
 }
 
-// GenerateClaimUrl generates a claim URL for ClaimLink
-func (cl *ClaimLink) GenerateClaimUrl() (link string, err error) {
-	return cl.ClaimUrl(cl.LinkKey, nil)
-}
-
-func (cl *ClaimLink) GetRecoveredLinkTypedData(
-	linkKeyId common.Address,
-) (*apitypes.TypedData, error) {
-	escrowVersion, err := helpers.DefineEscrowVersion(cl.EscrowAddress)
-	if err != nil {
-		return nil, err
-	}
-	typedData := helpers.RecoveredLinkTypedData(
-		linkKeyId,
-		cl.TransferId,
-		cl.Token.ChainId,
-		escrowVersion,
-		cl.EscrowAddress,
-	)
-	return &typedData, nil
-}
-
-// GenerateRecoveredClaimUrl generates a new recovered claim URL
-func (cl *ClaimLink) GenerateRecoveredClaimUrl(
-	getRandomBytes types.RandomBytesCallback,
-	signTypedData types.SignTypedDataCallback,
-) (link string, err error) {
-	newLinkKey, err := helpers.PrivateKey(getRandomBytes)
-	if err != nil {
-		return
-	}
-	linkKeyId, err := helpers.AddressFromPrivateKey(newLinkKey)
-	if err != nil {
-		return
-	}
-	typedData, err := cl.GetRecoveredLinkTypedData(linkKeyId)
-	if err != nil {
-		return
-	}
-	senderSignature, err := signTypedData(*typedData)
-	if err != nil {
-		return
-	}
-	return cl.ClaimUrl(newLinkKey, senderSignature)
-}
-
-// ClaimUrl returns a URL for the provided linkKey, senderSignature pair
-// NOTE: this is a low-level method. Use GenerateClaimUrl or GenerateRecoveredClaimUrl
-func (cl *ClaimLink) ClaimUrl(
-	linkKey *ecdsa.PrivateKey,
-	senderSignature []byte,
-) (link string, err error) {
-	if linkKey == nil {
-		return "", errors.New("can't generate claim url without linkKey")
-	}
+func (cl *ClaimLink) ClaimUrl() (link string, err error) {
 	link = helpers.EncodeLink(
 		cl.SDK.config.baseURL,
 		types.Link{
-			LinkKey:         *linkKey,
+			LinkKey:         *cl.LinkKey,
 			TransferId:      cl.TransferId,
 			ChainId:         cl.Token.ChainId,
-			SenderSignature: senderSignature,
+			SenderSignature: nil,
 			Sender:          &cl.Sender,
 			Message:         cl.Message,
 		},

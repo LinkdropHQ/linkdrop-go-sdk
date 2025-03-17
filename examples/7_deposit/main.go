@@ -72,7 +72,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	url, err := clERC20.GenerateClaimUrl()
+	url, err := clERC20.ClaimUrl()
 	if err != nil {
 		log.Fatalln(err)
 	}
