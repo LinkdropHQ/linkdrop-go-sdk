@@ -235,9 +235,9 @@ func (cl *ClaimLink) GetDepositParams() (params *types.ClaimLinkDepositParams, e
 		data, err = constants.EscrowTokenAbi.Pack(
 			"depositETH",
 			cl.TransferId,
-			cl.TotalAmount.String(),
+			cl.TotalAmount,
 			big.NewInt(cl.Expiration),
-			cl.Fee.Amount.String(),
+			cl.Fee.Amount,
 			cl.Fee.Authorization,
 			messageData,
 		)
