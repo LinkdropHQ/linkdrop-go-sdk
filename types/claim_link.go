@@ -41,6 +41,7 @@ const (
 	ClaimLinkStatusRefunding
 	ClaimLinkStatusRefunded
 	ClaimLinkStatusCancelled
+	ClaimLinkStatusDropped
 	ClaimLinkStatusError
 )
 
@@ -64,6 +65,8 @@ func (clis ClaimLinkStatus) String() string {
 		return "refunded"
 	case ClaimLinkStatusCancelled:
 		return "cancelled"
+	case ClaimLinkStatusDropped:
+		return "dropped"
 	case ClaimLinkStatusError:
 		return "error"
 	}
@@ -90,6 +93,8 @@ func ClaimLinkStatusFromString(value string) ClaimLinkStatus {
 		return ClaimLinkStatusRefunded
 	case "cancelled":
 		return ClaimLinkStatusCancelled
+	case "dropped":
+		return ClaimLinkStatusDropped
 	case "error":
 		return ClaimLinkStatusError
 	}
