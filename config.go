@@ -1,10 +1,5 @@
 package linkdrop
 
-import (
-	"github.com/LinkdropHQ/linkdrop-go-sdk/constants"
-	"github.com/ethereum/go-ethereum/common"
-)
-
 type MessageConfig struct {
 	MinEncryptionKeyLength uint16
 	MaxEncryptionKeyLength uint16
@@ -18,24 +13,15 @@ type ClientConfig struct {
 }
 
 type SDKConfig struct {
-	baseURL                  string
-	escrowContractAddress    common.Address
-	escrowNFTContractAddress common.Address
-	messageConfig            MessageConfig
-	environment              string
+	baseURL       string
+	messageConfig MessageConfig
+	environment   string
 }
 
+// applyDefaults be run by SDK before any other options
 func (sdkc *SDKConfig) applyDefaults() {
-	sdkc.escrowContractAddress = constants.EscrowContractAddress
-	sdkc.escrowNFTContractAddress = constants.EscrowNFTContractAddress
+	sdkc.applyDefaultMessageConfig()
 	sdkc.environment = "development"
-	sdkc.applyDefaultMessageConfig()
-}
-
-func (sdkc *SDKConfig) applyProductionDefaults() {
-	sdkc.escrowContractAddress = constants.EscrowContractAddress
-	sdkc.escrowNFTContractAddress = constants.EscrowNFTContractAddress
-	sdkc.applyDefaultMessageConfig()
 }
 
 func (sdkc *SDKConfig) applyDefaultMessageConfig() {

@@ -114,16 +114,24 @@ func (sdk *SDK) ClaimLinkRecovered(
 	token types.Token,
 	message *types.EncryptedMessage,
 	senderSignature []byte,
+	escrowAddress *common.Address,
 ) (claimLinkRecovered *ClaimLinkRecovered, err error) {
 	err = token.Validate()
 	if err != nil {
 		return
 	}
+	if escrowAddress == nil {
+		ea, err := helpers.EscrowAddressForToken(token)
+		if err != nil {
+			return nil, err
+		}
+		escrowAddress = &ea
+	}
 	claimLinkRecovered = &ClaimLinkRecovered{
 		SDK:             sdk,
 		TransferId:      transferId,
 		Token:           token,
-		EscrowAddress:   sdk.config.escrowContractAddress,
+		EscrowAddress:   *escrowAddress,
 		Message:         message,
 		SenderSignature: senderSignature,
 	}
