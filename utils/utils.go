@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -16,6 +17,12 @@ import (
 	"log"
 	"math/big"
 )
+
+func EscrowAddressByChain(
+	chain types.ChainId,
+) (escrow common.Address, escrowNFT common.Address, err error) {
+	return helpers.EscrowAddressByChain(chain)
+}
 
 func GetRandomBytes(length int64) []byte {
 	b := make([]byte, length)

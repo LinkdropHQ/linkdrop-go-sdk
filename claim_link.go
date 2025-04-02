@@ -35,10 +35,11 @@ type ClaimLink struct {
 }
 
 type ClaimLinkCreationParams struct {
-	Token      types.Token    `json:"token"`
-	Sender     common.Address `json:"sender"`
-	Amount     *big.Int       `json:"amount"`
-	Expiration int64          `json:"expiration"`
+	Token         types.Token     `json:"token"`
+	Sender        common.Address  `json:"sender"`
+	Amount        *big.Int        `json:"amount"`
+	Expiration    int64           `json:"expiration"`
+	EscrowAddress *common.Address `json:"escrowAddress"`
 }
 
 func (cl *ClaimLink) new(
@@ -69,6 +70,16 @@ func (cl *ClaimLink) new(
 		return
 	}
 
+	var escrowAddress common.Address
+	if params.EscrowAddress != nil {
+		escrowAddress = *params.EscrowAddress
+	} else {
+		escrowAddress, err = helpers.EscrowAddressByToken(params.Token)
+		if err != nil {
+			return
+		}
+	}
+
 	*cl = ClaimLink{
 		SDK: sdk,
 
@@ -82,7 +93,7 @@ func (cl *ClaimLink) new(
 		Fee:         fee,
 		TotalAmount: totalAmount,
 
-		EscrowAddress: sdk.config.escrowContractAddress,
+		EscrowAddress: escrowAddress,
 		Expiration:    params.Expiration,
 		Status:        types.ClaimLinkStatusCreated,
 	}

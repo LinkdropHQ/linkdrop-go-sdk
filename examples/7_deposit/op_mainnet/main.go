@@ -44,6 +44,13 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	// An example with a custom Escrow Address
+	// (can be skipped to use the default one for the Token chain set in ClaimLink)
+	escrowAddress, _, err := utils.EscrowAddressByChain(types.ChainIdOptimism)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	// ERC20
 	clERC20, err := sdk.ClaimLink(
 		linkdrop.ClaimLinkCreationParams{
@@ -52,9 +59,10 @@ func main() {
 				ChainId: types.ChainIdOptimism,
 				Address: common.HexToAddress("0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85"),
 			},
-			Sender:     common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
-			Amount:     big.NewInt(100000),
-			Expiration: 1773234550,
+			Sender:        common.HexToAddress(os.Getenv("SENDER_ADDRESS")),
+			Amount:        big.NewInt(100000),
+			Expiration:    1773234550,
+			EscrowAddress: &escrowAddress, // Custom Escrow Address
 		},
 		getRandomBytes,
 	)

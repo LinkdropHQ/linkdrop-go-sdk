@@ -35,7 +35,7 @@ func main() {
 		"https://p2p.linkdrop.io",
 		os.Getenv("LINKDROP_API_KEY"),
 		linkdrop.WithApiUrl("https://escrow-api.linkdrop.io/v3"),
-		linkdrop.WithCoinbaseWalletProductionDefaults(),
+		linkdrop.WithProductionDefaults(),
 	)
 	if err != nil {
 		log.Fatalln(err)
