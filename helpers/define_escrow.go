@@ -34,7 +34,7 @@ func EscrowAddressByChain(
 	return
 }
 
-func EscrowAddressForToken(
+func EscrowAddressByToken(
 	token types.Token,
 ) (escrowAddress common.Address, err error) {
 	escrow, escrowNFT, err := EscrowAddressByChain(token.ChainId)

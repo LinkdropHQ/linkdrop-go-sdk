@@ -74,7 +74,7 @@ func (cl *ClaimLink) new(
 	if params.EscrowAddress != nil {
 		escrowAddress = *params.EscrowAddress
 	} else {
-		escrowAddress, err = helpers.EscrowAddressForToken(params.Token)
+		escrowAddress, err = helpers.EscrowAddressByToken(params.Token)
 		if err != nil {
 			return
 		}

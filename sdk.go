@@ -121,7 +121,7 @@ func (sdk *SDK) ClaimLinkRecovered(
 		return
 	}
 	if escrowAddress == nil {
-		ea, err := helpers.EscrowAddressForToken(token)
+		ea, err := helpers.EscrowAddressByToken(token)
 		if err != nil {
 			return nil, err
 		}
