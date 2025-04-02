@@ -1,6 +1,8 @@
 package types
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"github.com/ethereum/go-ethereum/common"
+)
 
 type ChainConfig struct {
 	ChainId       ChainId
@@ -10,9 +12,17 @@ type ChainConfig struct {
 type ChainId int64
 
 const (
-	ChainIdBase ChainId = 8453
+	ChainIdBase      ChainId = 8453
+	ChainIdPolygon   ChainId = 137
+	ChainIdAvalanche ChainId = 43114
+	ChainIdOptimism  ChainId = 10
+	ChainIdArbitrum  ChainId = 42161
 )
 
 func (cid *ChainId) IsSupported() bool {
-	return *cid == ChainIdBase
+	switch *cid {
+	case ChainIdBase, ChainIdPolygon, ChainIdAvalanche, ChainIdOptimism, ChainIdArbitrum:
+		return true
+	}
+	return false
 }
