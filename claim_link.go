@@ -214,7 +214,7 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 }
 
 func (cl *ClaimLink) GetStatus() (status types.ClaimLinkStatus, operations []types.ClaimLinkOperation, err error) {
-	linkB, err := cl.SDK.Client.GetTransferStatus(cl.Token.ChainId, cl.TransferId, nil)
+	linkB, err := cl.SDK.Client.GetTransferStatus(cl.Token.ChainId, cl.TransferId)
 	claimLink := struct {
 		Status     types.ClaimLinkStatus      `json:"status"`
 		Operations []types.ClaimLinkOperation `json:"operations"`

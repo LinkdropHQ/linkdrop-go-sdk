@@ -135,17 +135,35 @@ func (c *Client) RedeemDashboardLink(
 func (c *Client) GetTransferStatus(
 	chainId types.ChainId,
 	transferId common.Address,
-	overrideHost *string,
 ) ([]byte, error) {
-	if overrideHost == nil {
-		apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
-		if err != nil {
-			return []byte{}, err
-		}
-		overrideHost = &apiHost
+	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
+	if err != nil {
+		return []byte{}, err
 	}
-	query := fmt.Sprintf("%s/payment-status/transfer/%s", *overrideHost, transferId.Hex())
-	return helpers.Request(query, "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+	return c.getTransferStatus(apiHost, transferId)
+}
+
+func (c *Client) GetDashboardLinkTransferStatus(
+	chainId types.ChainId,
+	transferId common.Address,
+) ([]byte, error) {
+	apiHost, err := helpers.DefineApiHost(constants.DashboardApiUrl, int64(chainId))
+	if err != nil {
+		return []byte{}, err
+	}
+	return c.getTransferStatus(apiHost, transferId)
+}
+
+func (c *Client) getTransferStatus(
+	apiHost string,
+	transferId common.Address,
+) ([]byte, error) {
+	return helpers.Request(
+		fmt.Sprintf("%s/payment-status/transfer/%s", apiHost, transferId.Hex()),
+		"GET",
+		helpers.DefineHeaders(c.config.apiKey),
+		nil,
+	)
 }
 
 // GetTransferStatusByTxHash retrieves the payment status of a transfer using its transaction hash.

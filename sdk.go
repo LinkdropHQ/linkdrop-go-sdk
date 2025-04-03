@@ -258,13 +258,17 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (redeemableClaimLink IClaimLinkRed
 		return
 	}
 
-	var chainId types.ChainId
-	var linkKey *ecdsa.PrivateKey
-	var transferId common.Address
-	var senderSignature []byte
-	var overrideHost *string
+	var (
+		linkKey         *ecdsa.PrivateKey
+		senderSignature []byte
+		apiResp         []byte
+	)
 
 	if linkSource == types.LinkSourceDashboard {
+		var (
+			transferId common.Address
+			chainId    types.ChainId
+		)
 		chainId, err = helpers.GetChainIdFromDashboardLink(claimUrl)
 		if err != nil {
 			return nil, err
@@ -277,26 +281,21 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (redeemableClaimLink IClaimLinkRed
 		if err != nil {
 			return nil, err
 		}
-		// https://escrow-api.linkdrop.io/dashboard/payment-status/transfer/0x15153a07E20E658f6195E5773dEf094351FdD79F
-		// https://escrow-api.linkdrop.io/dashboard/payment-status/transfer/0x15153a07E20E658f6195E5773dEf094351FdD79F
 		transferId, err = helpers.AddressFromPrivateKey(linkKey)
 		if err != nil {
 			return nil, err
 		}
-		host := constants.DashboardApiUrl
-		overrideHost = &host
+		apiResp, err = sdk.Client.GetDashboardLinkTransferStatus(chainId, transferId)
 	} else {
-		decodedLink, err := helpers.DecodeLink(claimUrl)
+		var decodedLink *types.Link
+		decodedLink, err = helpers.DecodeLink(claimUrl)
 		if err != nil {
 			return nil, err
 		}
-		chainId = decodedLink.ChainId
 		linkKey = &decodedLink.LinkKey
-		transferId = decodedLink.TransferId
 		senderSignature = decodedLink.SenderSignature
+		apiResp, err = sdk.Client.GetTransferStatus(decodedLink.ChainId, decodedLink.TransferId)
 	}
-
-	apiResp, err := sdk.Client.GetTransferStatus(chainId, transferId, overrideHost)
 	if err != nil {
 		return
 	}
