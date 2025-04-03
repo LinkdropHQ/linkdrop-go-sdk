@@ -8,6 +8,7 @@ import (
 	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"strings"
 )
@@ -256,17 +257,46 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (redeemableClaimLink IClaimLinkRed
 	if err != nil {
 		return
 	}
+
+	var chainId types.ChainId
+	var linkKey *ecdsa.PrivateKey
+	var transferId common.Address
+	var senderSignature []byte
+	var overrideHost *string
+
 	if linkSource == types.LinkSourceDashboard {
-		// TODO handle
-		return nil, errors.New("not implemented yet")
+		chainId, err = helpers.GetChainIdFromDashboardLink(claimUrl)
+		if err != nil {
+			return nil, err
+		}
+		linkCode := helpers.GetClaimCodeFromDashboardLink(claimUrl)
+		if linkCode == "" {
+			return nil, errors.New("link code is not found in the claim url")
+		}
+		linkKey, err = helpers.PrivateKeyFromHash(crypto.Keccak256Hash([]byte(linkCode)))
+		if err != nil {
+			return nil, err
+		}
+		// https://escrow-api.linkdrop.io/dashboard/payment-status/transfer/0x15153a07E20E658f6195E5773dEf094351FdD79F
+		// https://escrow-api.linkdrop.io/dashboard/payment-status/transfer/0x15153a07E20E658f6195E5773dEf094351FdD79F
+		transferId, err = helpers.AddressFromPrivateKey(linkKey)
+		if err != nil {
+			return nil, err
+		}
+		host := constants.DashboardApiUrl
+		overrideHost = &host
+	} else {
+		decodedLink, err := helpers.DecodeLink(claimUrl)
+		if err != nil {
+			return nil, err
+		}
+		chainId = decodedLink.ChainId
+		linkKey = &decodedLink.LinkKey
+		transferId = decodedLink.TransferId
+		senderSignature = decodedLink.SenderSignature
 	}
 
-	decodedLink, err := helpers.DecodeLink(claimUrl)
-	if err != nil {
-		return
-	}
-
-	apiResp, err := sdk.Client.GetTransferStatus(decodedLink.ChainId, decodedLink.TransferId)
+	apiResp, err := sdk.Client.GetTransferStatus(chainId, transferId, overrideHost)
 	if err != nil {
 		return
 	}
@@ -308,7 +338,7 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (redeemableClaimLink IClaimLinkRed
 		feeTokenType = types.TokenTypeNative
 	}
 
-	if decodedLink.SenderSignature != nil {
+	if senderSignature != nil {
 		redeemableClaimLink = &ClaimLinkRecovered{
 			SDK:        sdk,
 			TransferId: common.HexToAddress(cl["transfer_id"].(string)),
@@ -320,8 +350,8 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (redeemableClaimLink IClaimLinkRed
 				Id:      tokenId,
 			},
 			EscrowAddress:   common.HexToAddress(cl["escrow"].(string)),
-			LinkKey:         &decodedLink.LinkKey,
-			SenderSignature: decodedLink.SenderSignature,
+			LinkKey:         linkKey,
+			SenderSignature: senderSignature,
 		}
 		return
 	}
@@ -348,8 +378,9 @@ func (sdk *SDK) GetClaimLink(claimUrl string) (redeemableClaimLink IClaimLinkRed
 		Expiration:    int64(cl["expiration"].(float64)),
 		TransferId:    common.HexToAddress(cl["transfer_id"].(string)),
 		EscrowAddress: common.HexToAddress(cl["escrow"].(string)),
-		LinkKey:       &decodedLink.LinkKey,
+		LinkKey:       linkKey,
 		Status:        types.ClaimLinkStatusFromString(cl["status"].(string)),
+		Source:        linkSource,
 	}
 	return
 }

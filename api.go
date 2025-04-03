@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/LinkdropHQ/linkdrop-go-sdk/constants"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/helpers"
 	"github.com/LinkdropHQ/linkdrop-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -83,7 +84,7 @@ func (c *Client) RedeemLink(
 	escrow common.Address,
 	receiverSig []byte,
 	senderSig []byte,
-) ([]byte, error) {
+) (resp []byte, err error) {
 	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(token.ChainId))
 	apiEndpoint := "%s/redeem"
 	if err != nil {
@@ -105,6 +106,20 @@ func (c *Client) RedeemLink(
 	return helpers.Request(fmt.Sprintf(apiEndpoint, apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
 }
 
+func (c *Client) RedeemDashboardLink(
+	transferId common.Address,
+	receiver common.Address,
+	receiverSig []byte,
+) (resp []byte, err error) {
+	bodyRaw := map[string]string{
+		"transfer_id":  transferId.Hex(),
+		"receiver":     receiver.Hex(),
+		"receiver_sig": "0x" + hex.EncodeToString(receiverSig),
+	}
+	body, _ := json.Marshal(bodyRaw)
+	return helpers.Request(fmt.Sprintf("%s/redeem", constants.DashboardApiUrl), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+}
+
 // GetTransferStatus retrieves the payment status of a transfer using its unique transfer ID.
 //
 // Parameters:
@@ -120,12 +135,17 @@ func (c *Client) RedeemLink(
 func (c *Client) GetTransferStatus(
 	chainId types.ChainId,
 	transferId common.Address,
+	overrideHost *string,
 ) ([]byte, error) {
-	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
-	if err != nil {
-		return []byte{}, err
+	if overrideHost == nil {
+		apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
+		if err != nil {
+			return []byte{}, err
+		}
+		overrideHost = &apiHost
 	}
-	return helpers.Request(fmt.Sprintf("%s/payment-status/transfer/%s", apiHost, transferId.Hex()), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+	query := fmt.Sprintf("%s/payment-status/transfer/%s", *overrideHost, transferId.Hex())
+	return helpers.Request(query, "GET", helpers.DefineHeaders(c.config.apiKey), nil)
 }
 
 // GetTransferStatusByTxHash retrieves the payment status of a transfer using its transaction hash.

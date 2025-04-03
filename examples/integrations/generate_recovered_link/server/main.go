@@ -45,7 +45,7 @@ func main() {
 			ChainId: payload.ClaimLink.Token.ChainId,
 			Address: payload.ClaimLink.Token.Address,
 		},
-		nil, nil,
+		nil, nil, nil,
 	)
 	if err != nil {
 		log.Fatalln(err)

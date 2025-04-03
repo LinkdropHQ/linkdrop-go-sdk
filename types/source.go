@@ -6,6 +6,6 @@ type LinkSource string
 
 const (
 	LinkSourceUndefined LinkSource = ""
-	LinkSourceP2P       LinkSource = "P2P"
-	LinkSourceDashboard LinkSource = "D"
+	LinkSourceP2P       LinkSource = "p2p"
+	LinkSourceDashboard LinkSource = "d"
 )

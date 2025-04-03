@@ -32,6 +32,7 @@ type ClaimLink struct {
 	Expiration    int64
 	Operations    []types.ClaimLinkOperation
 	Status        types.ClaimLinkStatus
+	Source        types.LinkSource
 }
 
 type ClaimLinkCreationParams struct {
@@ -175,15 +176,24 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 		return
 	}
 
-	bApiResp, err := cl.SDK.Client.RedeemLink(
-		cl.TransferId,
-		cl.Token,
-		cl.Sender,
-		receiver,
-		cl.EscrowAddress,
-		receiverSig,
-		nil,
-	)
+	var bApiResp []byte
+	if cl.Source == types.LinkSourceDashboard {
+		bApiResp, err = cl.SDK.Client.RedeemDashboardLink(
+			cl.TransferId,
+			receiver,
+			receiverSig,
+		)
+	} else {
+		bApiResp, err = cl.SDK.Client.RedeemLink(
+			cl.TransferId,
+			cl.Token,
+			cl.Sender,
+			receiver,
+			cl.EscrowAddress,
+			receiverSig,
+			nil,
+		)
+	}
 	if err != nil {
 		return
 	}
@@ -204,7 +214,7 @@ func (cl *ClaimLink) Redeem(receiver common.Address) (txHash common.Hash, err er
 }
 
 func (cl *ClaimLink) GetStatus() (status types.ClaimLinkStatus, operations []types.ClaimLinkOperation, err error) {
-	linkB, err := cl.SDK.Client.GetTransferStatus(cl.Token.ChainId, cl.TransferId)
+	linkB, err := cl.SDK.Client.GetTransferStatus(cl.Token.ChainId, cl.TransferId, nil)
 	claimLink := struct {
 		Status     types.ClaimLinkStatus      `json:"status"`
 		Operations []types.ClaimLinkOperation `json:"operations"`

@@ -25,7 +25,11 @@ func PrivateKey(
 	if len(seed) != 32 {
 		return nil, fmt.Errorf("seed must be exactly 32 bytes")
 	}
-	d := new(big.Int).SetBytes(seed)
+	return PrivateKeyFromHash(common.BytesToHash(seed))
+}
+
+func PrivateKeyFromHash(privateKeyBytes common.Hash) (*ecdsa.PrivateKey, error) {
+	d := new(big.Int).SetBytes(privateKeyBytes.Bytes())
 	curve := crypto.S256()
 	order := curve.Params().N
 	if d.Sign() <= 0 || d.Cmp(order) >= 0 {
@@ -34,7 +38,7 @@ func PrivateKey(
 	privateKey := new(ecdsa.PrivateKey)
 	privateKey.D = d
 	privateKey.PublicKey.Curve = curve
-	privateKey.PublicKey.X, privateKey.PublicKey.Y = curve.ScalarBaseMult(seed)
+	privateKey.PublicKey.X, privateKey.PublicKey.Y = curve.ScalarBaseMult(privateKeyBytes.Bytes())
 
 	return privateKey, nil
 }
