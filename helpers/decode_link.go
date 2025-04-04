@@ -31,12 +31,15 @@ func defineSig(signatureLength int, signatureHex string) []byte {
 }
 
 func DecodeLink(link string) (*types.Link, error) {
-	queryArgs, err := url.ParseQuery(link)
+	var queryArgs url.Values
+	parsedLink, err := url.Parse(link)
+	if err != nil {
+		return nil, err
+	}
 	if strings.Contains(link, "/#/") {
-		parsedLink, _ := url.Parse(link)
 		queryArgs, err = url.ParseQuery(strings.Split(parsedLink.Fragment, "?")[1])
 	} else {
-		queryArgs, err = url.ParseQuery(link)
+		queryArgs = parsedLink.Query()
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse query parameters: %w", err)
