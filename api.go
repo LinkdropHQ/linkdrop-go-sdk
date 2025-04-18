@@ -108,6 +108,7 @@ func (c *Client) RedeemLink(
 // GetTransferStatus retrieves the payment status of a transfer using its unique transfer ID.
 //
 // Parameters:
+// - chainId: The chain ID of the blockchain network to be used for the operation.
 // - transferId: The unique identifier of the transfer.
 //
 // Returns:
@@ -131,6 +132,7 @@ func (c *Client) GetTransferStatus(
 // GetTransferStatusByTxHash retrieves the payment status of a transfer using its transaction hash.
 //
 // Parameters:
+// - chainId: The chain ID of the blockchain network to be used for the operation.
 // - txHash: The transaction hash associated with the transfer.
 //
 // Returns:
@@ -140,8 +142,15 @@ func (c *Client) GetTransferStatus(
 // Notes:
 // - This function sends a GET request to the API to fetch the transfer's payment status by transaction hash.
 // - Ensure the transaction hash corresponds to a valid transfer and has been processed.
-func (c *Client) GetTransferStatusByTxHash(txHash string) ([]byte, error) {
-	return helpers.Request(fmt.Sprintf("%s/payment-status/transaction/%s", c.config.apiURL, txHash), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+func (c *Client) GetTransferStatusByTxHash(
+	chainId types.ChainId,
+	txHash string,
+) ([]byte, error) {
+	apiHost, err := helpers.DefineApiHost(c.config.apiURL, int64(chainId))
+	if err != nil {
+		return []byte{}, err
+	}
+	return helpers.Request(fmt.Sprintf("%s/payment-status/transaction/%s", apiHost, txHash), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
 }
 
 // GetFee calculates the transaction fee required for a transfer based on token details, sender's address, transfer ID,
