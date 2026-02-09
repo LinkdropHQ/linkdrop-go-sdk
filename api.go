@@ -53,7 +53,7 @@ func (c *Client) RedeemRecoveredLink(
 
 		"token": token.Address.Hex(),
 	})
-	return helpers.Request(fmt.Sprintf("%s/redeem-recovered", c.config.apiURL), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	return helpers.Request(fmt.Sprintf("%s/redeem-recovered", c.config.apiURL), "POST", helpers.DefineHeaders(c.config.apiKey), body, c.config.HTTPTimeout)
 }
 
 // RedeemLink allows a receiver to redeem a link by providing details such as transfer ID,
@@ -102,7 +102,7 @@ func (c *Client) RedeemLink(
 		apiEndpoint = "%s/redeem-recovered"
 	}
 	body, _ := json.Marshal(bodyRaw)
-	return helpers.Request(fmt.Sprintf(apiEndpoint, apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	return helpers.Request(fmt.Sprintf(apiEndpoint, apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body, c.config.HTTPTimeout)
 }
 
 // GetTransferStatus retrieves the payment status of a transfer using its unique transfer ID.
@@ -126,7 +126,7 @@ func (c *Client) GetTransferStatus(
 	if err != nil {
 		return []byte{}, err
 	}
-	return helpers.Request(fmt.Sprintf("%s/payment-status/transfer/%s", apiHost, transferId.Hex()), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+	return helpers.Request(fmt.Sprintf("%s/payment-status/transfer/%s", apiHost, transferId.Hex()), "GET", helpers.DefineHeaders(c.config.apiKey), nil, c.config.HTTPTimeout)
 }
 
 // GetTransferStatusByTxHash retrieves the payment status of a transfer using its transaction hash.
@@ -150,7 +150,7 @@ func (c *Client) GetTransferStatusByTxHash(
 	if err != nil {
 		return []byte{}, err
 	}
-	return helpers.Request(fmt.Sprintf("%s/payment-status/transaction/%s", apiHost, txHash), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+	return helpers.Request(fmt.Sprintf("%s/payment-status/transaction/%s", apiHost, txHash), "GET", helpers.DefineHeaders(c.config.apiKey), nil, c.config.HTTPTimeout)
 }
 
 // GetFee calculates the transaction fee required for a transfer based on token details, sender's address, transfer ID,
@@ -200,7 +200,7 @@ func (c *Client) GetFee(
 		"expiration":    strconv.Itoa(int(expiration)),
 		"token_id":      tokenId,
 	})
-	return helpers.Request(fmt.Sprintf("%s/fee?%s", apiHost, query), "GET", helpers.DefineHeaders(c.config.apiKey), nil)
+	return helpers.Request(fmt.Sprintf("%s/fee?%s", apiHost, query), "GET", helpers.DefineHeaders(c.config.apiKey), nil, c.config.HTTPTimeout)
 }
 
 // GetHistory fetches the history of transfers related to a token and sender's address.
@@ -240,6 +240,7 @@ func (c *Client) GetHistory(
 		"GET",
 		helpers.DefineHeaders(c.config.apiKey),
 		nil,
+		c.config.HTTPTimeout,
 	)
 }
 
@@ -268,6 +269,7 @@ func (c *Client) GetLimits(token types.Token) ([]byte, error) {
 		"GET",
 		helpers.DefineHeaders(c.config.apiKey),
 		nil,
+		c.config.HTTPTimeout,
 	)
 }
 
@@ -324,7 +326,7 @@ func (c *Client) Deposit(
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
-	return helpers.Request(fmt.Sprintf(endpoint, apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	return helpers.Request(fmt.Sprintf(endpoint, apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body, c.config.HTTPTimeout)
 }
 
 func (c *Client) DepositWithAuthorization(
@@ -368,6 +370,6 @@ func (c *Client) DepositWithAuthorization(
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
-	resp, err := helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body)
+	resp, err := helpers.Request(fmt.Sprintf("%s/deposit-with-authorization", apiHost), "POST", helpers.DefineHeaders(c.config.apiKey), body, c.config.HTTPTimeout)
 	return resp, err
 }

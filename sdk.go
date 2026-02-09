@@ -42,6 +42,7 @@ func Init(baseUrl string, apiKey string, opts ...Option) (*SDK, error) {
 		apiKey: apiKey,
 		apiURL: constants.ApiURL,
 	}
+	clientConfig.applyDefaults()
 	for _, opt := range opts {
 		opt(&sdkConfig, clientConfig)
 	}

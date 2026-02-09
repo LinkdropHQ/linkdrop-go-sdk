@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 func DefineHeaders(apiKey string) http.Header {
@@ -23,8 +24,10 @@ func CreateQueryString(params map[string]string) string {
 	return query.Encode()
 }
 
-func Request(url string, method string, headers http.Header, body []byte) ([]byte, error) {
-	client := &http.Client{}
+func Request(url string, method string, headers http.Header, body []byte, timeout time.Duration) ([]byte, error) {
+	client := &http.Client{
+		Timeout: timeout,
+	}
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err

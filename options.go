@@ -1,5 +1,7 @@
 package linkdrop
 
+import "time"
+
 type Option func(*SDKConfig, *ClientConfig)
 
 func WithEnvironmentTag(tag string) Option {
@@ -17,6 +19,12 @@ func WithMessageConfig(messageConfig MessageConfig) Option {
 func WithApiUrl(apiUrl string) Option {
 	return func(sdkc *SDKConfig, cc *ClientConfig) {
 		cc.apiURL = apiUrl
+	}
+}
+
+func WithHTTPTimeout(timeout time.Duration) Option {
+	return func(sdkc *SDKConfig, cc *ClientConfig) {
+		cc.HTTPTimeout = timeout
 	}
 }
 
