@@ -1,5 +1,7 @@
 package linkdrop
 
+import "time"
+
 type MessageConfig struct {
 	MinEncryptionKeyLength uint16
 	MaxEncryptionKeyLength uint16
@@ -8,8 +10,9 @@ type MessageConfig struct {
 
 // ClientConfig is a configuration of the API Client
 type ClientConfig struct {
-	apiKey string
-	apiURL string
+	apiKey      string
+	apiURL      string
+	HTTPTimeout time.Duration
 }
 
 type SDKConfig struct {
@@ -22,6 +25,10 @@ type SDKConfig struct {
 func (sdkc *SDKConfig) applyDefaults() {
 	sdkc.applyDefaultMessageConfig()
 	sdkc.environment = "development"
+}
+
+func (cc *ClientConfig) applyDefaults() {
+	cc.HTTPTimeout = 30 * time.Second
 }
 
 func (sdkc *SDKConfig) applyDefaultMessageConfig() {
